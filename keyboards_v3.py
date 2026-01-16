@@ -6,7 +6,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
 # Mini App URL - deploy qilgandan so'ng o'zgartiring
-MINI_APP_URL = "https://your-mini-app-url.vercel.app"
+MINI_APP_URL = "https://hearty-curiosity-production.up.railway.app"
 
 
 # ==================== REPLY KEYBOARDS ====================
