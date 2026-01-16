@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, CheckCircle, XCircle, Loader, RefreshCw } from 'lucide-react'
-import { Card, EmptyState, Button } from '../components'
+import { Card, EmptyState, Button, Loading } from '../components'
+import { ordersAPI } from '../lib/api'
 import { mockOrders } from '../lib/mockData'
+import type { Order } from '../types'
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   pending: { icon: Clock, color: '#F59E0B', label: 'Kutilmoqda' },
@@ -15,7 +17,30 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; label: s
 }
 
 export default function Orders() {
-  const [orders] = useState(mockOrders)
+  const [orders, setOrders] = useState<Order[]>(mockOrders)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true)
+      const data = await ordersAPI.getMyOrders()
+      if (data.orders && data.orders.length > 0) {
+        setOrders(data.orders)
+      }
+    } catch (error) {
+      console.log('Using mock orders')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrders()
+  }, [])
+
+  if (isLoading) {
+    return <Loading />
+  }
 
   return (
     <div className="space-y-6">
@@ -24,7 +49,7 @@ export default function Orders() {
           <h1 className="text-2xl font-bold text-tg-text">Buyurtmalarim</h1>
           <p className="text-tg-hint">{orders.length} ta buyurtma</p>
         </div>
-        <Button variant="ghost" onClick={() => {}} icon={<RefreshCw size={18} />}>
+        <Button variant="ghost" onClick={fetchOrders} icon={<RefreshCw size={18} />}>
           Yangilash
         </Button>
       </div>

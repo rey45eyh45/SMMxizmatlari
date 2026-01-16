@@ -9,15 +9,21 @@ import {
   Sparkles
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
-import { PlatformCard, Card } from '../components'
-import { mockUser, mockPlatforms } from '../lib/mockData'
+import { useAuth } from '../providers'
+import { PlatformCard, Card, Loading } from '../components'
+import { mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user: tgUser, hapticFeedback } = useTelegram()
+  const { hapticFeedback } = useTelegram()
+  const { user, isLoading } = useAuth()
 
-  const displayName = tgUser?.first_name || mockUser.full_name || 'Foydalanuvchi'
-  const balance = mockUser.balance
+  if (isLoading) {
+    return <Loading />
+  }
+
+  const displayName = user?.full_name || 'Foydalanuvchi'
+  const balance = user?.balance || 0
 
   const handleNavigation = (path: string) => {
     hapticFeedback?.selection?.()

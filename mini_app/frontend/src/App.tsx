@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useTelegram } from './hooks/useTelegram'
+import { AuthProvider } from './providers'
 
 // Pages
 import Home from './pages/Home'
@@ -37,22 +38,24 @@ function App() {
   }, [tg, ready])
 
   return (
-    <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/services/:platformId" element={<Platform />} />
-          <Route path="/order/:serviceId" element={<ServiceOrder />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/balance" element={<Balance />} />
-          <Route path="/deposit" element={<Deposit />} />
-          <Route path="/referral" element={<Referral />} />
-          <Route path="/sms" element={<SMS />} />
-          <Route path="/premium" element={<Premium />} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/services/:platformId" element={<Platform />} />
+            <Route path="/order/:serviceId" element={<ServiceOrder />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/balance" element={<Balance />} />
+            <Route path="/deposit" element={<Deposit />} />
+            <Route path="/referral" element={<Referral />} />
+            <Route path="/sms" element={<SMS />} />
+            <Route path="/premium" element={<Premium />} />
+          </Routes>
+        </Layout>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

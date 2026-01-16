@@ -1,13 +1,45 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Copy, Users, Gift, Share2 } from 'lucide-react'
-import { Card } from '../components'
+import { Card, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+import { useAuth } from '../providers'
+import { userAPI } from '../lib/api'
 import { mockReferralStats } from '../lib/mockData'
+import type { ReferralStats } from '../types'
 
 export default function Referral() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
+  const { user } = useAuth()
+  const [stats, setStats] = useState<ReferralStats>(mockReferralStats)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const stats = mockReferralStats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true)
+        const data = await userAPI.getReferralStats()
+        setStats(data)
+      } catch (error) {
+        // Use user data for referral stats
+        if (user) {
+          setStats({
+            referral_count: user.referral_count || 0,
+            referral_earnings: user.referral_earnings || 0,
+            referral_link: `https://t.me/SmmXizmatlari_bot?start=ref${user.user_id}`,
+            referrals: []
+          })
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchStats()
+  }, [user])
+
+  if (isLoading) {
+    return <Loading />
+  }
 
   const copyLink = () => {
     if (stats.referral_link) {

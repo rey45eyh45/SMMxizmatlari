@@ -1,16 +1,43 @@
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, History, TrendingUp, CreditCard } from 'lucide-react'
-import { Card, Button } from '../components'
+import { Card, Button, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
-import { mockUser, mockPayments } from '../lib/mockData'
+import { useAuth } from '../providers'
+import { paymentsAPI } from '../lib/api'
+import { mockPayments } from '../lib/mockData'
+import type { Payment } from '../types'
 
 export default function Balance() {
   const navigate = useNavigate()
   const { hapticFeedback } = useTelegram()
-  const [payments] = useState(mockPayments)
-  const balance = mockUser.balance
+  const { user, isLoading: authLoading } = useAuth()
+  const [payments, setPayments] = useState<Payment[]>(mockPayments)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const balance = user?.balance || 0
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        setIsLoading(true)
+        const data = await paymentsAPI.getMyPayments()
+        if (data.payments && data.payments.length > 0) {
+          setPayments(data.payments)
+        }
+      } catch (error) {
+        console.log('Using mock payments')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPayments()
+  }, [])
+
+  if (authLoading || isLoading) {
+    return <Loading />
+  }
 
   return (
     <div className="space-y-6">
