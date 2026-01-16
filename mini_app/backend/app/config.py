@@ -30,11 +30,13 @@ FIVESIM_API_KEY = os.getenv("FIVESIM_API_KEY", "")
 SMSPVA_API_KEY = os.getenv("SMSPVA_API_KEY", "")
 
 # CORS origins
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 CORS_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "https://web.telegram.org",
     "https://*.telegram.org",
+    FRONTEND_URL,
 ]
 
 # JWT sozlamalari
