@@ -61,7 +61,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const requestPhoneAuth = useCallback(() => {
     if (tg) {
       // Botga yo'naltirish - u yerda /start bosib, keyin "Open" orqali qaytadi
-      tg.openTelegramLink('https://t.me/ideal_smm_uz_bot?start=miniapp')
+      tg.openTelegramLink('https://t.me/smm_xizmatlari_aibot?start=miniapp')
     }
   }, [tg])
 
