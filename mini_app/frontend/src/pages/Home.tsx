@@ -6,7 +6,8 @@ import {
   ShoppingBag, 
   Crown, 
   ChevronRight,
-  Sparkles
+  Sparkles,
+  User
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -15,15 +16,16 @@ import { mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { hapticFeedback } = useTelegram()
+  const { hapticFeedback, user: tgUser } = useTelegram()
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return <Loading />
   }
 
-  const displayName = user?.full_name || 'Foydalanuvchi'
+  const displayName = user?.full_name || tgUser?.first_name || 'Foydalanuvchi'
   const balance = user?.balance || 0
+  const photoUrl = tgUser?.photo_url
 
   const handleNavigation = (path: string) => {
     hapticFeedback?.selection?.()
@@ -32,18 +34,34 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Profile */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center py-2"
+        className="flex items-center gap-4 py-2"
       >
-        <h1 className="text-2xl font-bold text-tg-text">
-          Salom, {displayName}! 👋
-        </h1>
-        <p className="text-tg-hint mt-1">
-          SMM xizmatlari sizga yaqin
-        </p>
+        {/* Profile Photo */}
+        <div className="w-14 h-14 rounded-full bg-gradient-to-r from-tg-button to-blue-500 flex items-center justify-center overflow-hidden shrink-0">
+          {photoUrl ? (
+            <img 
+              src={photoUrl} 
+              alt={displayName}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <User size={28} className="text-white" />
+          )}
+        </div>
+        
+        {/* Greeting */}
+        <div className="flex-1">
+          <h1 className="text-xl font-bold text-tg-text">
+            Salom, {displayName}! 👋
+          </h1>
+          <p className="text-tg-hint text-sm">
+            SMM xizmatlari sizga yaqin
+          </p>
+        </div>
       </motion.div>
 
       {/* Balance Card */}
