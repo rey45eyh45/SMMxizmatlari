@@ -2,8 +2,11 @@
 """
 KEYBOARDS - Aiogram 3.x uchun klaviaturalar
 """
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
+
+# Mini App URL - deploy qilgandan so'ng o'zgartiring
+MINI_APP_URL = "https://your-mini-app-url.vercel.app"
 
 
 # ==================== REPLY KEYBOARDS ====================
@@ -20,6 +23,11 @@ def main_menu():
         KeyboardButton(text="💰 Mening hisobim"),
         KeyboardButton(text="💵 Hisob to'ldirish")
     )
+    # Mini App tugmasi
+    builder.row(KeyboardButton(
+        text="📱 Mini App ochish", 
+        web_app=WebAppInfo(url=MINI_APP_URL)
+    ))
     return builder.as_markup(resize_keyboard=True)
 
 
