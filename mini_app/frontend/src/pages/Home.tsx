@@ -16,8 +16,8 @@ import { mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { hapticFeedback, user: tgUser } = useTelegram()
-  const { user, isLoading } = useAuth()
+  const { hapticFeedback, user: tgUser, tg } = useTelegram()
+  const { user, isLoading, isDemo, requestPhoneAuth } = useAuth()
 
   if (isLoading) {
     return <Loading />
@@ -32,8 +32,42 @@ export default function Home() {
     navigate(path)
   }
 
+  const handleConnectAccount = () => {
+    hapticFeedback?.impact?.('medium')
+    requestPhoneAuth()
+  }
+
   return (
     <div className="space-y-6">
+      {/* Demo mode warning */}
+      {isDemo && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+              <User size={20} className="text-yellow-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-yellow-600 dark:text-yellow-400 font-medium text-sm">
+                Demo rejimdasiz
+              </p>
+              <p className="text-tg-hint text-xs mt-0.5">
+                Akkauntingizni ulash uchun tugmani bosing
+              </p>
+            </div>
+            <button
+              onClick={handleConnectAccount}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
+            >
+              Ulash
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header with Profile */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

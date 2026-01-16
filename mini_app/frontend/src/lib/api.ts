@@ -65,6 +65,11 @@ export const userAPI = {
     return data
   },
   
+  getById: async (userId: number): Promise<{ success: boolean; user: User }> => {
+    const { data } = await api.get(`/api/user/${userId}`)
+    return data
+  },
+  
   getBalance: async (): Promise<{ balance: number }> => {
     const { data } = await api.get('/api/user/balance')
     return data

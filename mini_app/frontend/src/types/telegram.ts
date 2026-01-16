@@ -35,6 +35,10 @@ export interface TelegramWebApp {
   showAlert(message: string, callback?: () => void): void
   showConfirm(message: string, callback?: (confirmed: boolean) => void): void
   
+  // Bot API 6.9+ Contact request
+  requestContact(callback?: (success: boolean) => void): void
+  requestWriteAccess(callback?: (success: boolean) => void): void
+  
   // Main Button
   MainButton: MainButton
   
@@ -43,6 +47,19 @@ export interface TelegramWebApp {
   
   // Haptic Feedback
   HapticFeedback: HapticFeedback
+  
+  // Cloud Storage
+  CloudStorage?: CloudStorage
+}
+
+// Cloud Storage interface
+export interface CloudStorage {
+  setItem(key: string, value: string, callback?: (err: Error | null, stored: boolean) => void): void
+  getItem(key: string, callback: (err: Error | null, value: string | null) => void): void
+  getItems(keys: string[], callback: (err: Error | null, values: Record<string, string>) => void): void
+  removeItem(key: string, callback?: (err: Error | null, removed: boolean) => void): void
+  removeItems(keys: string[], callback?: (err: Error | null, removed: boolean) => void): void
+  getKeys(callback: (err: Error | null, keys: string[]) => void): void
 }
 
 export interface TelegramUser {
