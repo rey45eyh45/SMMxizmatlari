@@ -57,32 +57,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isDemo, setIsDemo] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Telefon raqamini so'rash va autentifikatsiya qilish
+  // Botga yo'naltirish - foydalanuvchi /start bosib qaytadi
   const requestPhoneAuth = useCallback(() => {
-    if (!tg) return
-    
-    // Telegram requestContact metodi
-    tg.requestContact((success: boolean) => {
-      if (success) {
-        console.log('Contact shared successfully')
-        // Contact shared - bot message orqali user_id ni olish
-        // Bu hodisadan keyin bot foydalanuvchiga xabar yuboradi
-        // va biz CloudStorage dan user ma'lumotlarini olishimiz mumkin
-        
-        // CloudStorage dan foydalanuvchi ID sini o'qish
-        setTimeout(() => {
-          tg.CloudStorage?.getItem('user_id', (err: Error | null, value: string | null) => {
-            if (!err && value) {
-              const userId = parseInt(value, 10)
-              saveUserId(userId)
-              fetchUserById(userId)
-            }
-          })
-        }, 2000) // Bot javob berishi uchun 2 soniya kutish
-      } else {
-        console.log('Contact sharing cancelled')
-      }
-    })
+    if (tg) {
+      // Botga yo'naltirish - u yerda /start bosib, keyin "Open" orqali qaytadi
+      tg.openTelegramLink('https://t.me/ideal_smm_uz_bot?start=miniapp')
+    }
   }, [tg])
 
   // User ID bo'yicha foydalanuvchini olish

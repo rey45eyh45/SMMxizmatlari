@@ -55,14 +55,14 @@ export default function Home() {
                 Demo rejimdasiz
               </p>
               <p className="text-tg-hint text-xs mt-0.5">
-                Akkauntingizni ulash uchun tugmani bosing
+                Botga o'ting va "Open" tugmasini bosing
               </p>
             </div>
             <button
               onClick={handleConnectAccount}
               className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
             >
-              Ulash
+              Botga o'tish
             </button>
           </div>
         </motion.div>
