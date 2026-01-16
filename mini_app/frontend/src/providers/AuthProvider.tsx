@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { authAPI, setTelegramInitData, userAPI } from '../lib/api'
 import { useTelegram } from '../hooks/useTelegram'
 import type { User } from '../types'
@@ -7,20 +7,16 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  isDemo: boolean
   error: string | null
   refetchUser: () => Promise<void>
-  requestPhoneAuth: () => void
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isAuthenticated: false,
-  isDemo: false,
   error: null,
   refetchUser: async () => {},
-  requestPhoneAuth: () => {},
 })
 
 export function useAuth() {
@@ -31,155 +27,75 @@ interface AuthProviderProps {
   children: ReactNode
 }
 
-// LocalStorage dan saqlangan user_id ni olish
-const getSavedUserId = (): number | null => {
-  try {
-    const saved = localStorage.getItem('tg_user_id')
-    return saved ? parseInt(saved, 10) : null
-  } catch {
-    return null
-  }
-}
-
-// LocalStorage ga user_id ni saqlash
-const saveUserId = (userId: number) => {
-  try {
-    localStorage.setItem('tg_user_id', userId.toString())
-  } catch {
-    // Ignore storage errors
-  }
-}
-
 export function AuthProvider({ children }: AuthProviderProps) {
   const { tg, initData, user: tgUser } = useTelegram()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDemo, setIsDemo] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Botga yo'naltirish - foydalanuvchi /start bosib qaytadi
-  const requestPhoneAuth = useCallback(() => {
-    if (tg) {
-      // Botga yo'naltirish - u yerda /start bosib, keyin "Open" orqali qaytadi
-      tg.openTelegramLink('https://t.me/smm_xizmatlari_aibot?start=miniapp')
-    }
-  }, [tg])
-
-  // User ID bo'yicha foydalanuvchini olish
-  const fetchUserById = async (userId: number) => {
-    try {
-      setIsLoading(true)
-      const response = await userAPI.getById(userId)
-      if (response.success && response.user) {
-        setUser(response.user)
-        setIsDemo(false)
-        saveUserId(userId)
-      }
-    } catch (err) {
-      console.error('Failed to fetch user:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const authenticate = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      // 1. Avval initData orqali autentifikatsiya qilishga harakat
+      // 1. initData mavjud bo'lsa - HMAC bilan validate qilish
       if (initData && initData.length > 0) {
         console.log('Authenticating with initData')
         setTelegramInitData(initData)
 
-        const response = await authAPI.authenticate(initData)
-        
-        if (response.success && response.user) {
-          setUser(response.user)
-          setIsDemo(false)
-          saveUserId(response.user.user_id)
-          setIsLoading(false)
-          return
+        try {
+          const response = await authAPI.authenticate(initData)
+          if (response.success && response.user) {
+            setUser(response.user)
+            setIsLoading(false)
+            return
+          }
+        } catch (err) {
+          console.log('initData auth failed, trying other methods')
         }
       }
 
-      // 2. initDataUnsafe dan user ma'lumotlarini olish
+      // 2. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish/yaratish
       if (tgUser?.id) {
         console.log('Using tgUser ID:', tgUser.id)
-        saveUserId(tgUser.id)
         
         try {
+          // Avval mavjud userni olishga harakat
           const response = await userAPI.getById(tgUser.id)
           if (response.success && response.user) {
             setUser(response.user)
-            setIsDemo(false)
             setIsLoading(false)
             return
           }
         } catch {
-          // User not found, continue
+          // User topilmadi - yangi yaratamiz
+          console.log('User not found, creating new user')
         }
-      }
 
-      // 3. LocalStorage dan saqlangan user_id ni tekshirish
-      const savedUserId = getSavedUserId()
-      if (savedUserId) {
-        console.log('Using saved user ID:', savedUserId)
+        // Yangi user yaratish
         try {
-          const response = await userAPI.getById(savedUserId)
-          if (response.success && response.user) {
-            setUser(response.user)
-            setIsDemo(false)
+          const newUser = await userAPI.createOrGet({
+            user_id: tgUser.id,
+            username: tgUser.username || '',
+            full_name: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || 'Foydalanuvchi'
+          })
+          if (newUser.success && newUser.user) {
+            setUser(newUser.user)
             setIsLoading(false)
             return
           }
-        } catch {
-          // Saved user not found, continue
+        } catch (err) {
+          console.error('Failed to create user:', err)
         }
       }
 
-      // 4. CloudStorage dan user_id ni o'qish
-      if (tg?.CloudStorage) {
-        tg.CloudStorage.getItem('user_id', async (err: Error | null, value: string | null) => {
-          if (!err && value) {
-            const userId = parseInt(value, 10)
-            console.log('Using CloudStorage user ID:', userId)
-            saveUserId(userId)
-            await fetchUserById(userId)
-            return
-          }
-        })
-      }
-
-      // 5. Hech biri ishlamasa - Demo mode
-      console.log('No authentication method available - using demo mode')
-      setIsDemo(true)
-      setUser({
-        user_id: tgUser?.id || 123456789,
-        username: tgUser?.username || 'demo_user',
-        full_name: tgUser?.first_name || 'Demo User',
-        balance: 50000,
-        referral_count: 5,
-        referral_earnings: 10000,
-        is_banned: false,
-        created_at: new Date().toISOString()
-      })
+      // 3. Hech narsa ishlamasa - xatolik
+      console.log('No user data available')
+      setError('Foydalanuvchi aniqlanmadi')
+      
     } catch (err: any) {
       console.error('Auth error:', err)
-      setError(err.message || 'Authentication failed')
-      
-      // Fallback to demo mode
-      setIsDemo(true)
-      setUser({
-        user_id: tgUser?.id || 123456789,
-        username: tgUser?.username || 'demo_user',
-        full_name: tgUser?.first_name || 'Demo User',
-        balance: 50000,
-        referral_count: 5,
-        referral_earnings: 10000,
-        is_banned: false,
-        created_at: new Date().toISOString()
-      })
+      setError(err.message || 'Autentifikatsiya xatosi')
     } finally {
       setIsLoading(false)
     }
@@ -190,13 +106,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   useEffect(() => {
-    // Telegram WebApp tayyor bo'lganda autentifikatsiya qilish
     if (tg) {
       tg.ready()
-      tg.expand() // Mini App ni to'liq ochish
+      tg.expand()
       authenticate()
     } else {
-      // Browser'da test qilish uchun
+      // Browser test
       authenticate()
     }
   }, [tg])
@@ -207,10 +122,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         user,
         isLoading,
         isAuthenticated: !!user,
-        isDemo,
         error,
         refetchUser,
-        requestPhoneAuth,
       }}
     >
       {children}

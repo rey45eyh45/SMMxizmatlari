@@ -16,15 +16,30 @@ import { mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { hapticFeedback, user: tgUser, tg } = useTelegram()
-  const { user, isLoading, isDemo, requestPhoneAuth } = useAuth()
+  const { hapticFeedback, user: tgUser } = useTelegram()
+  const { user, isLoading, error } = useAuth()
 
   if (isLoading) {
     return <Loading />
   }
 
-  const displayName = user?.full_name || tgUser?.first_name || 'Foydalanuvchi'
-  const balance = user?.balance || 0
+  // Agar xatolik bo'lsa
+  if (error || !user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+        <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <User size={40} className="text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-tg-text mb-2">Xatolik</h2>
+        <p className="text-tg-hint text-center">
+          {error || "Foydalanuvchi aniqlanmadi. Iltimos, Mini App ni qayta oching."}
+        </p>
+      </div>
+    )
+  }
+
+  const displayName = user.full_name || tgUser?.first_name || 'Foydalanuvchi'
+  const balance = user.balance || 0
   const photoUrl = tgUser?.photo_url
 
   const handleNavigation = (path: string) => {
@@ -32,42 +47,8 @@ export default function Home() {
     navigate(path)
   }
 
-  const handleConnectAccount = () => {
-    hapticFeedback?.impact?.('medium')
-    requestPhoneAuth()
-  }
-
   return (
     <div className="space-y-6">
-      {/* Demo mode warning */}
-      {isDemo && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-              <User size={20} className="text-yellow-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-yellow-600 dark:text-yellow-400 font-medium text-sm">
-                Demo rejimdasiz
-              </p>
-              <p className="text-tg-hint text-xs mt-0.5">
-                Botga o'ting va "Open" tugmasini bosing
-              </p>
-            </div>
-            <button
-              onClick={handleConnectAccount}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
-            >
-              Botga o'tish
-            </button>
-          </div>
-        </motion.div>
-      )}
-
       {/* Header with Profile */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

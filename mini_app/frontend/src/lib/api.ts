@@ -70,6 +70,11 @@ export const userAPI = {
     return data
   },
   
+  createOrGet: async (userData: { user_id: number; username: string; full_name: string }): Promise<{ success: boolean; user: User }> => {
+    const { data } = await api.post('/api/user/create', userData)
+    return data
+  },
+  
   getBalance: async (): Promise<{ balance: number }> => {
     const { data } = await api.get('/api/user/balance')
     return data

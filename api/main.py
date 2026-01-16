@@ -204,6 +204,40 @@ async def get_me(user_data: dict = Depends(get_current_user)):
     }
 
 
+class CreateUserRequest(BaseModel):
+    user_id: int
+    username: str = ""
+    full_name: str = "Foydalanuvchi"
+
+
+@app.post("/api/user/create")
+async def create_or_get_user(request: CreateUserRequest):
+    """Foydalanuvchi yaratish yoki mavjudini qaytarish"""
+    user = get_user(request.user_id)
+    
+    if not user:
+        # Yangi user yaratish
+        add_user(request.user_id, request.username, request.full_name)
+        user = get_user(request.user_id)
+    
+    if not user:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+    
+    return {
+        "success": True,
+        "user": {
+            "user_id": user[0],
+            "username": user[1],
+            "full_name": user[2],
+            "balance": user[3],
+            "referral_count": user[4] if len(user) > 4 else 0,
+            "referral_earnings": user[5] if len(user) > 5 else 0,
+            "is_banned": bool(user[7]) if len(user) > 7 else False,
+            "created_at": user[8] if len(user) > 8 else ""
+        }
+    }
+
+
 @app.get("/api/user/{user_id}")
 async def get_user_by_id(user_id: int):
     """User ID bo'yicha foydalanuvchi ma'lumotlarini olish"""
