@@ -11,6 +11,14 @@ MINI_APP_URL = "https://hearty-curiosity-production.up.railway.app"
 
 # ==================== REPLY KEYBOARDS ====================
 
+def phone_request_keyboard():
+    """Telefon raqam so'rash uchun klaviatura"""
+    builder = ReplyKeyboardBuilder()
+    builder.row(KeyboardButton(text="📱 Telefon raqamni yuborish", request_contact=True))
+    builder.row(KeyboardButton(text="⬅️ O'tkazib yuborish"))
+    return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+
+
 def main_menu():
     """Asosiy menyu"""
     builder = ReplyKeyboardBuilder()
@@ -158,20 +166,6 @@ def premium_confirm_inline(months: int, price: int):
     builder.row(InlineKeyboardButton(text=f"✅ Ha, {price:,} so'm to'layman", callback_data=f"confirm_premium_{months}"))
     builder.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="buy_premium_menu"))
     return builder.as_markup()
-
-
-def phone_request_keyboard():
-    """Telefon raqam so'rash tugmasi"""
-    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📱 Telefon raqamimni ulashish", request_contact=True)],
-            [KeyboardButton(text="❌ Bekor qilish")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    return keyboard
 
 
 def premium_admin_inline(user_id: int, months: int, price: int, request_id: int):

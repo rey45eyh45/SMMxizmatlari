@@ -29,3 +29,8 @@ class AdminState(StatesGroup):
     waiting_for_user_id = State()
     waiting_for_balance_amount = State()
     waiting_for_ban_reason = State()
+
+
+class PhoneAuthState(StatesGroup):
+    """Telefon raqam orqali autentifikatsiya"""
+    waiting_for_phone = State()

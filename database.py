@@ -18,9 +18,16 @@ def init_db():
             referral_count INTEGER DEFAULT 0,
             referral_earnings REAL DEFAULT 0,
             is_banned INTEGER DEFAULT 0,
-            created_at TEXT
+            created_at TEXT,
+            phone TEXT
         )
     ''')
+    
+    # phone ustuni mavjud bo'lmasa qo'shish
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN phone TEXT')
+    except:
+        pass  # Ustun allaqachon mavjud
     
     # Buyurtmalar jadvali
     cursor.execute('''
@@ -232,6 +239,32 @@ def get_user(user_id):
     user = cursor.fetchone()
     conn.close()
     return user
+
+
+def get_user_by_phone(phone):
+    """Telefon raqam bo'yicha foydalanuvchini topish"""
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+    # Telefon raqamni normalizatsiya qilish
+    phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+    cursor.execute("SELECT * FROM users WHERE phone = ? OR phone = ?", (phone, '+' + phone))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+
+def update_user_phone(user_id, phone):
+    """Foydalanuvchi telefon raqamini yangilash"""
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+    # Telefon raqamni normalizatsiya qilish
+    phone = phone.replace(' ', '').replace('-', '')
+    if not phone.startswith('+'):
+        phone = '+' + phone
+    cursor.execute('UPDATE users SET phone = ? WHERE user_id = ?', (phone, user_id))
+    conn.commit()
+    conn.close()
+
 
 def update_balance(user_id, amount):
     """Balansni yangilash"""

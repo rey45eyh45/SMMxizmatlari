@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database import (
     get_user, add_user, update_balance, get_user_orders,
-    get_setting, get_user_payments_admin
+    get_setting, get_user_payments_admin, get_user_by_phone
 )
 from config import BOT_TOKEN
 
@@ -242,6 +242,38 @@ async def create_or_get_user(request: CreateUserRequest):
 async def get_user_by_id(user_id: int):
     """User ID bo'yicha foydalanuvchi ma'lumotlarini olish"""
     user = get_user(user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "success": True,
+        "user": {
+            "user_id": user[0],
+            "username": user[1],
+            "full_name": user[2],
+            "balance": user[3],
+            "referral_count": user[4] if len(user) > 4 else 0,
+            "referral_earnings": user[5] if len(user) > 5 else 0,
+            "is_banned": bool(user[7]) if len(user) > 7 else False,
+            "created_at": user[8] if len(user) > 8 else ""
+        }
+    }
+
+
+@app.get("/api/user/by-phone/{phone}")
+async def get_user_by_phone_number(phone: str):
+    """Telefon raqam bo'yicha foydalanuvchi ma'lumotlarini olish"""
+    # Telefon raqamni tozalash (faqat raqamlar)
+    clean_phone = ''.join(filter(str.isdigit, phone))
+    
+    user = get_user_by_phone(clean_phone)
+    
+    if not user:
+        # +998 bilan ham tekshiramiz
+        if not clean_phone.startswith('998'):
+            clean_phone = '998' + clean_phone
+            user = get_user_by_phone(clean_phone)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

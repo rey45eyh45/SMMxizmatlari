@@ -70,6 +70,11 @@ export const userAPI = {
     return data
   },
   
+  getByPhone: async (phone: string): Promise<{ success: boolean; user: User }> => {
+    const { data } = await api.get(`/api/user/by-phone/${encodeURIComponent(phone)}`)
+    return data
+  },
+  
   createOrGet: async (userData: { user_id: number; username: string; full_name: string }): Promise<{ success: boolean; user: User }> => {
     const { data } = await api.post('/api/user/create', userData)
     return data

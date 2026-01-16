@@ -84,9 +84,18 @@ class AdminState(StatesGroup):
     waiting_for_ref_bonus = State()  # Referal bonus
 
 
+class RegistrationState(StatesGroup):
+    waiting_for_phone = State()  # Telefon raqam kutish
+
+
 class PremiumState(StatesGroup):
     waiting_for_phone = State()  # Telefon raqam kutish
     waiting_for_payment = State()  # To'lov kutish
+
+
+class PhoneAuthState(StatesGroup):
+    """Mini App uchun telefon raqam autentifikatsiyasi"""
+    waiting_for_phone = State()
 
 
 # ==================== SOZLAMALARDAN QIYMAT OLUVCHI FUNKSIYALAR ====================
@@ -988,14 +997,17 @@ def get_payment_info(method, amount):
 # ==================== HANDLERS ====================
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username
     full_name = message.from_user.full_name
     
+    # State ni tozalash
+    await state.clear()
+    
     # Bloklangan foydalanuvchini tekshirish
     user = get_user(user_id)
-    if user and len(user) > 8 and user[8] == 1:
+    if user and len(user) > 7 and user[7] == 1:
         await message.answer("🚫 <b>Sizning hisobingiz bloklangan!</b>\n\nAdmin bilan bog'laning: @komilov_manager")
         return
     
@@ -1016,6 +1028,25 @@ async def cmd_start(message: Message):
     user = get_user(user_id)
     balance = user[3] if user else 0
     
+    # Telefon raqam borligini tekshirish (9-chi ustun - phone)
+    has_phone = user and len(user) > 9 and user[9]
+    
+    # Agar telefon raqam yo'q bo'lsa - so'rash
+    if not has_phone:
+        from keyboards_v3 import phone_request_keyboard
+        
+        text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        text += f"👋 Assalomu alaykum, <b>{full_name}</b>!\n\n"
+        text += "📱 <b>Ro'yxatdan o'tish uchun telefon raqamingizni yuboring.</b>\n\n"
+        text += "Bu Mini App dan foydalanish uchun kerak bo'ladi."
+        
+        await message.answer(text, reply_markup=phone_request_keyboard())
+        await state.set_state(RegistrationState.waiting_for_phone)
+        await state.update_data(referral_id=referral_id, bonus_given=bonus_given)
+        return
+    
+    # Telefon bor - asosiy menyuga
     welcome_text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
     welcome_text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
     
@@ -1038,6 +1069,88 @@ async def cmd_start(message: Message):
     welcome_text += "├ 🎵 TikTok follower, like, view\n"
     welcome_text += "└ 📱 Virtual telefon raqamlar (SMS)\n\n"
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
+    welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
+    
+    await message.answer(welcome_text, reply_markup=main_menu())
+
+
+# Telefon raqam qabul qilish
+@router.message(RegistrationState.waiting_for_phone, F.contact)
+async def process_phone_contact(message: Message, state: FSMContext):
+    """Telefon raqam - kontakt orqali"""
+    from database import update_user_phone
+    
+    phone = message.contact.phone_number
+    if not phone.startswith("+"):
+        phone = "+" + phone
+    
+    user_id = message.from_user.id
+    full_name = message.from_user.full_name
+    
+    # Telefon raqamni saqlash
+    update_user_phone(user_id, phone)
+    
+    # State dan ma'lumotlarni olish
+    data = await state.get_data()
+    referral_id = data.get('referral_id')
+    bonus_given = data.get('bonus_given', False)
+    
+    await state.clear()
+    
+    user = get_user(user_id)
+    balance = user[3] if user else 0
+    
+    welcome_text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
+    welcome_text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
+    welcome_text += "✅ <b>Telefon raqamingiz saqlandi!</b>\n\n"
+    
+    if bonus_given:
+        bonus_amount = get_referral_bonus()
+        welcome_text += f"🎁 <b>Tabriklaymiz!</b> Sizga {bonus_amount:,} so'm bonus berildi!\n\n"
+        try:
+            await bot.send_message(
+                referral_id,
+                f"🎉 <b>Yangi referal!</b>\n\n👤 {full_name} sizning havolangiz orqali qo'shildi!\n💰 Sizga {bonus_amount:,} so'm bonus berildi!"
+            )
+        except:
+            pass
+    
+    welcome_text += f"👋 Xush kelibsiz, <b>{full_name}</b>!\n\n"
+    welcome_text += "📱 <b>Bizning xizmatlar:</b>\n"
+    welcome_text += "├ 📲 Telegram obunachi, ko'rish, reaksiya\n"
+    welcome_text += "├ 📸 Instagram follower, like, view\n"
+    welcome_text += "├ ▶️ YouTube subscriber, view, like\n"
+    welcome_text += "├ 🎵 TikTok follower, like, view\n"
+    welcome_text += "└ 📱 Virtual telefon raqamlar (SMS)\n\n"
+    welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
+    welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
+    
+    await message.answer(welcome_text, reply_markup=main_menu())
+
+
+# O'tkazib yuborish
+@router.message(RegistrationState.waiting_for_phone, F.text == "⬅️ O'tkazib yuborish")
+async def skip_phone(message: Message, state: FSMContext):
+    """Telefon raqamni o'tkazib yuborish"""
+    await state.clear()
+    
+    user_id = message.from_user.id
+    full_name = message.from_user.full_name
+    
+    user = get_user(user_id)
+    balance = user[3] if user else 0
+    
+    welcome_text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
+    welcome_text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
+    welcome_text += f"👋 Assalomu alaykum, <b>{full_name}</b>!\n\n"
+    welcome_text += "📱 <b>Bizning xizmatlar:</b>\n"
+    welcome_text += "├ 📲 Telegram obunachi, ko'rish, reaksiya\n"
+    welcome_text += "├ 📸 Instagram follower, like, view\n"
+    welcome_text += "├ ▶️ YouTube subscriber, view, like\n"
+    welcome_text += "├ 🎵 TikTok follower, like, view\n"
+    welcome_text += "└ 📱 Virtual telefon raqamlar (SMS)\n\n"
+    welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
+    welcome_text += "⚠️ <i>Mini App dan foydalanish uchun /start bosib telefon raqamingizni yuboring.</i>\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
     await message.answer(welcome_text, reply_markup=main_menu())
