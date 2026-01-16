@@ -1,29 +1,12 @@
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { PlatformCard, Loading, ErrorState } from '../components'
-import { servicesAPI } from '../lib/api'
+import { PlatformCard } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
-
-const platformColors: Record<string, string> = {
-  telegram: '#0088cc',
-  instagram: '#E1306C',
-  youtube: '#FF0000',
-  tiktok: '#000000',
-  sms: '#4CAF50'
-}
+import { mockPlatforms } from '../lib/mockData'
 
 export default function Services() {
   const navigate = useNavigate()
   const { hapticFeedback } = useTelegram()
-
-  const { data: platforms, isLoading, error, refetch } = useQuery({
-    queryKey: ['platforms'],
-    queryFn: servicesAPI.getPlatforms
-  })
-
-  if (isLoading) return <Loading />
-  if (error) return <ErrorState onRetry={() => refetch()} />
 
   return (
     <div className="space-y-6">
@@ -33,7 +16,7 @@ export default function Services() {
       </div>
 
       <div className="space-y-3">
-        {platforms?.map((platform, index) => (
+        {mockPlatforms.map((platform, index) => (
           <motion.div
             key={platform.id}
             initial={{ opacity: 0, x: -20 }}
@@ -43,10 +26,10 @@ export default function Services() {
             <PlatformCard
               emoji={platform.emoji}
               name={platform.name}
-              color={platformColors[platform.id] || '#0088cc'}
+              color={platform.color}
               onClick={() => {
-                hapticFeedback.selection()
-                navigate(`/services/${platform.id}`)
+                hapticFeedback?.selection?.()
+                navigate(`/platform/${platform.id}`)
               }}
             />
           </motion.div>
@@ -63,7 +46,7 @@ export default function Services() {
             name="Virtual Raqamlar"
             color="#4CAF50"
             onClick={() => {
-              hapticFeedback.selection()
+              hapticFeedback?.selection?.()
               navigate('/sms')
             }}
           />

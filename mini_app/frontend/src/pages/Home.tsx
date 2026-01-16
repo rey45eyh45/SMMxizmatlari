@@ -8,27 +8,19 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react'
-import { useAuthStore } from '../store'
 import { useTelegram } from '../hooks/useTelegram'
 import { PlatformCard, Card } from '../components'
-
-const platforms = [
-  { id: 'telegram', name: 'Telegram', emoji: '✈️', color: '#0088cc', count: 15 },
-  { id: 'instagram', name: 'Instagram', emoji: '📸', color: '#E1306C', count: 12 },
-  { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', count: 8 },
-  { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', count: 10 },
-]
+import { mockUser, mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const { user: tgUser, hapticFeedback } = useTelegram()
 
-  const displayName = user?.full_name || tgUser?.first_name || 'Foydalanuvchi'
-  const balance = user?.balance || 0
+  const displayName = tgUser?.first_name || mockUser.full_name || 'Foydalanuvchi'
+  const balance = mockUser.balance
 
   const handleNavigation = (path: string) => {
-    hapticFeedback.selection()
+    hapticFeedback?.selection?.()
     navigate(path)
   }
 
@@ -126,7 +118,7 @@ export default function Home() {
         </div>
         
         <div className="space-y-3">
-          {platforms.map((platform, index) => (
+          {mockPlatforms.map((platform, index) => (
             <motion.div
               key={platform.id}
               initial={{ opacity: 0, x: -20 }}
@@ -136,9 +128,8 @@ export default function Home() {
               <PlatformCard
                 emoji={platform.emoji}
                 name={platform.name}
-                servicesCount={platform.count}
                 color={platform.color}
-                onClick={() => handleNavigation(`/services/${platform.id}`)}
+                onClick={() => handleNavigation(`/platform/${platform.id}`)}
               />
             </motion.div>
           ))}

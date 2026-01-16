@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Copy, RefreshCw, X, Check, Loader } from 'lucide-react'
-import { Card, Button, Loading, ErrorState } from '../components'
-import { smsAPI } from '../lib/api'
+import { Phone, Copy, RefreshCw, X } from 'lucide-react'
+import { Card, Button } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
-import type { SMSPlatform, SMSCountry } from '../types'
+import { mockSMSPlatforms, mockSMSCountries } from '../lib/mockData'
+
+// Mock SMS prices
+const mockSMSPrices = [
+  { provider_name: '5sim', available: 245, price_uzs: 15000 },
+  { provider_name: 'SMS-Activate', available: 189, price_uzs: 18000 },
+  { provider_name: 'SMSPVA', available: 56, price_uzs: 12000 },
+]
 
 export default function SMS() {
   const { hapticFeedback, showAlert } = useTelegram()
@@ -18,71 +23,46 @@ export default function SMS() {
     provider: string
     code?: string
   } | null>(null)
+  const [isBuying, setIsBuying] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
 
-  // Platforms
-  const { data: platforms, isLoading: platformsLoading } = useQuery({
-    queryKey: ['sms-platforms'],
-    queryFn: smsAPI.getPlatforms
-  })
+  const platforms = mockSMSPlatforms
+  const countries = mockSMSCountries
+  const prices = selectedPlatform ? mockSMSPrices : []
 
-  // Countries
-  const { data: countries } = useQuery({
-    queryKey: ['sms-countries'],
-    queryFn: smsAPI.getCountries
-  })
-
-  // Prices
-  const { data: prices, isLoading: pricesLoading, refetch: refetchPrices } = useQuery({
-    queryKey: ['sms-prices', selectedPlatform, selectedCountry],
-    queryFn: () => smsAPI.getPrices(selectedPlatform!, selectedCountry),
-    enabled: !!selectedPlatform
-  })
-
-  // Buy mutation
-  const buyMutation = useMutation({
-    mutationFn: () => smsAPI.buy(selectedPlatform!, selectedCountry),
-    onSuccess: (data) => {
+  const handleBuy = (price: any) => {
+    setIsBuying(true)
+    setTimeout(() => {
+      setIsBuying(false)
       hapticFeedback.notification('success')
       setActiveOrder({
-        orderId: data.order_id,
-        phone: data.phone_number,
-        provider: data.provider
+        orderId: 'demo_123',
+        phone: '+79123456789',
+        provider: price.provider_name
       })
-    },
-    onError: (error: any) => {
-      hapticFeedback.notification('error')
-      showAlert(error.response?.data?.detail || 'Xatolik yuz berdi')
-    }
-  })
+    }, 1000)
+  }
 
-  // Check code
-  const checkCodeMutation = useMutation({
-    mutationFn: () => smsAPI.checkCode(activeOrder!.provider, activeOrder!.orderId),
-    onSuccess: (data) => {
-      if (data.code) {
-        hapticFeedback.notification('success')
-        setActiveOrder(prev => prev ? { ...prev, code: data.code } : null)
-      }
-    }
-  })
-
-  // Cancel
-  const cancelMutation = useMutation({
-    mutationFn: () => smsAPI.cancel(activeOrder!.provider, activeOrder!.orderId),
-    onSuccess: () => {
+  const handleCheckCode = () => {
+    setIsChecking(true)
+    setTimeout(() => {
+      setIsChecking(false)
       hapticFeedback.notification('success')
-      showAlert('Buyurtma bekor qilindi')
-      setActiveOrder(null)
-    }
-  })
+      setActiveOrder(prev => prev ? { ...prev, code: '123456' } : null)
+    }, 1500)
+  }
+
+  const handleCancel = () => {
+    hapticFeedback.notification('success')
+    showAlert('Buyurtma bekor qilindi')
+    setActiveOrder(null)
+  }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     hapticFeedback.notification('success')
     showAlert('📋 Nusxalandi!')
   }
-
-  if (platformsLoading) return <Loading />
 
   return (
     <div className="space-y-6">
@@ -103,7 +83,7 @@ export default function SMS() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Faol buyurtma</h3>
                 <button
-                  onClick={() => cancelMutation.mutate()}
+                  onClick={handleCancel}
                   className="p-1 rounded-lg bg-white/20"
                 >
                   <X size={18} />
@@ -141,8 +121,8 @@ export default function SMS() {
                   fullWidth
                   variant="secondary"
                   className="mt-4 bg-white text-green-600"
-                  onClick={() => checkCodeMutation.mutate()}
-                  loading={checkCodeMutation.isPending}
+                  onClick={handleCheckCode}
+                  loading={isChecking}
                   icon={<RefreshCw size={18} />}
                 >
                   SMS tekshirish
@@ -214,22 +194,20 @@ export default function SMS() {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => refetchPrices()}
+              onClick={() => {}}
               icon={<RefreshCw size={14} />}
             >
               Yangilash
             </Button>
           </div>
 
-          {pricesLoading ? (
-            <Loading />
-          ) : prices?.length === 0 ? (
+          {prices.length === 0 ? (
             <Card className="text-center py-6">
               <p className="text-tg-hint">Raqam mavjud emas</p>
             </Card>
           ) : (
             <div className="space-y-2">
-              {prices?.map((price, index) => (
+              {prices.map((price, index) => (
                 <Card 
                   key={index}
                   className="flex items-center justify-between"
@@ -240,8 +218,8 @@ export default function SMS() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => buyMutation.mutate()}
-                    loading={buyMutation.isPending}
+                    onClick={() => handleBuy(price)}
+                    loading={isBuying}
                     disabled={activeOrder !== null}
                   >
                     {price.price_uzs.toLocaleString()} so'm

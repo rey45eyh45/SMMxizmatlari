@@ -1,25 +1,27 @@
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Crown, Check, Star, Sparkles } from 'lucide-react'
-import { Card, Button, Loading, ErrorState } from '../components'
-import { servicesAPI, userAPI } from '../lib/api'
+import { Crown, Star, Sparkles } from 'lucide-react'
+import { Card } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+
+// Mock premium plans
+const mockPlans = [
+  { months: 1, price: 100000, original_price: 120000, discount_percent: 17, popular: false, best_value: false },
+  { months: 3, price: 270000, original_price: 360000, discount_percent: 25, popular: true, best_value: false },
+  { months: 6, price: 480000, original_price: 720000, discount_percent: 33, popular: false, best_value: true },
+  { months: 12, price: 850000, original_price: 1440000, discount_percent: 41, popular: false, best_value: false },
+]
+
+// Mock premium status
+const mockPremiumStatus = {
+  is_premium: false,
+  days_left: 0
+}
 
 export default function Premium() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
 
-  const { data: plans, isLoading, error, refetch } = useQuery({
-    queryKey: ['premium-plans'],
-    queryFn: servicesAPI.getPremiumPlans
-  })
-
-  const { data: status } = useQuery({
-    queryKey: ['premium-status'],
-    queryFn: userAPI.getPremiumStatus
-  })
-
-  if (isLoading) return <Loading />
-  if (error) return <ErrorState onRetry={() => refetch()} />
+  const plans = mockPlans
+  const status = mockPremiumStatus
 
   const handleSelectPlan = (months: number, price: number) => {
     hapticFeedback.impact('medium')
@@ -48,7 +50,7 @@ export default function Premium() {
       </div>
 
       {/* Current Status */}
-      {status?.is_premium && (
+      {status.is_premium && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -107,7 +109,7 @@ export default function Premium() {
       >
         <h2 className="font-semibold text-tg-text">Tariflar:</h2>
         
-        {plans?.map((plan, index) => (
+        {plans.map((plan, index) => (
           <motion.div
             key={plan.months}
             initial={{ opacity: 0, x: -20 }}

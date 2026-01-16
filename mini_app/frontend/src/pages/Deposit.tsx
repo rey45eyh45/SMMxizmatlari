@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Check, Copy, AlertCircle } from 'lucide-react'
-import { Card, Button, Input, Loading, ErrorState } from '../components'
-import { paymentsAPI } from '../lib/api'
+import { Card, Button, Input } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 
 const quickAmounts = [10000, 25000, 50000, 100000, 250000, 500000]
+
+// Mock payment methods
+const mockPaymentMethods = [
+  { id: 'uzcard', name: 'UzCard', card_number: '8600 1234 5678 9012', card_holder: 'IDEAL SMM', min_amount: 5000 },
+  { id: 'humo', name: 'Humo', card_number: '9860 1234 5678 9012', card_holder: 'IDEAL SMM', min_amount: 5000 },
+]
 
 export default function Deposit() {
   const navigate = useNavigate()
@@ -16,36 +20,27 @@ export default function Deposit() {
   const [amount, setAmount] = useState('')
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
   const [step, setStep] = useState<'amount' | 'method' | 'confirm'>('amount')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: methods, isLoading, error, refetch } = useQuery({
-    queryKey: ['payment-methods'],
-    queryFn: paymentsAPI.getMethods
-  })
-
-  const createPaymentMutation = useMutation({
-    mutationFn: () => paymentsAPI.create(parseInt(amount), selectedMethod!),
-    onSuccess: (payment) => {
-      hapticFeedback.notification('success')
-      showAlert(`✅ To'lov #${payment.id} yaratildi! Admin tasdiqlashini kuting.`)
-      navigate('/balance')
-    },
-    onError: (error: any) => {
-      hapticFeedback.notification('error')
-      showAlert(error.response?.data?.detail || 'Xatolik yuz berdi')
-    }
-  })
-
-  if (isLoading) return <Loading />
-  if (error) return <ErrorState onRetry={() => refetch()} />
-
-  const currentMethod = methods?.find(m => m.id === selectedMethod)
+  const methods = mockPaymentMethods
+  const currentMethod = methods.find(m => m.id === selectedMethod)
   const parsedAmount = parseInt(amount) || 0
-  const minAmount = methods?.[0]?.min_amount || 5000
+  const minAmount = methods[0]?.min_amount || 5000
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text.replace(/\s/g, ''))
     hapticFeedback.notification('success')
     showAlert('📋 Karta raqami nusxalandi!')
+  }
+
+  const handleConfirm = () => {
+    setIsSubmitting(true)
+    setTimeout(() => {
+      setIsSubmitting(false)
+      hapticFeedback.notification('success')
+      showAlert(`✅ To'lov so'rovi yaratildi! Admin tasdiqlashini kuting.`)
+      navigate('/balance')
+    }, 1000)
   }
 
   return (
@@ -223,8 +218,8 @@ export default function Deposit() {
               Orqaga
             </Button>
             <Button
-              onClick={() => createPaymentMutation.mutate()}
-              loading={createPaymentMutation.isPending}
+              onClick={handleConfirm}
+              loading={isSubmitting}
               icon={<Check size={20} />}
               className="flex-1"
             >

@@ -1,25 +1,16 @@
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, History, TrendingUp, CreditCard } from 'lucide-react'
-import { Card, Button, Loading, ErrorState } from '../components'
-import { userAPI, paymentsAPI } from '../lib/api'
+import { Card, Button } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
-import { useAuthStore } from '../store'
+import { mockUser, mockPayments } from '../lib/mockData'
 
 export default function Balance() {
   const navigate = useNavigate()
   const { hapticFeedback } = useTelegram()
-  const { user } = useAuthStore()
-
-  const { data: payments, isLoading, error, refetch } = useQuery({
-    queryKey: ['my-payments'],
-    queryFn: () => paymentsAPI.getMyPayments(10)
-  })
-
-  const balance = user?.balance || 0
-
-  if (error) return <ErrorState onRetry={() => refetch()} />
+  const [payments] = useState(mockPayments)
+  const balance = mockUser.balance
 
   return (
     <div className="space-y-6">
@@ -41,7 +32,7 @@ export default function Balance() {
             className="mt-6 bg-white text-tg-button hover:bg-white/90"
             icon={<Plus size={20} />}
             onClick={() => {
-              hapticFeedback.impact('medium')
+              hapticFeedback?.impact?.('medium')
               navigate('/deposit')
             }}
           >
@@ -65,9 +56,9 @@ export default function Balance() {
             <div>
               <p className="text-tg-hint text-sm">Jami kirim</p>
               <p className="text-tg-text font-semibold">
-                {payments?.reduce((sum, p) => 
-                  p.status === 'tasdiqlandi' ? sum + p.amount : sum, 0
-                ).toLocaleString() || 0} so'm
+                {payments.reduce((sum, p) => 
+                  p.status === 'completed' ? sum + p.amount : sum, 0
+                ).toLocaleString()} so'm
               </p>
             </div>
           </div>
@@ -80,7 +71,7 @@ export default function Balance() {
             </div>
             <div>
               <p className="text-tg-hint text-sm">To'lovlar</p>
-              <p className="text-tg-text font-semibold">{payments?.length || 0} ta</p>
+              <p className="text-tg-text font-semibold">{payments.length} ta</p>
             </div>
           </div>
         </Card>
@@ -97,19 +88,22 @@ export default function Balance() {
           <h2 className="text-lg font-semibold text-tg-text">To'lovlar tarixi</h2>
         </div>
 
-        {isLoading ? (
-          <Loading />
-        ) : payments?.length === 0 ? (
+        {payments.length === 0 ? (
           <Card className="text-center py-8">
             <p className="text-tg-hint">To'lovlar tarixi bo'sh</p>
           </Card>
         ) : (
           <div className="space-y-2">
-            {payments?.map((payment, index) => {
+            {payments.map((payment, index) => {
               const statusColors: Record<string, string> = {
-                'kutilmoqda': '#F59E0B',
-                'tasdiqlandi': '#10B981',
-                'rad etildi': '#EF4444'
+                'pending': '#F59E0B',
+                'completed': '#10B981',
+                'failed': '#EF4444'
+              }
+              const statusLabels: Record<string, string> = {
+                'pending': 'Kutilmoqda',
+                'completed': 'Tasdiqlandi',
+                'failed': 'Rad etildi'
               }
               
               return (
@@ -131,7 +125,7 @@ export default function Balance() {
                         className="text-sm font-medium"
                         style={{ color: statusColors[payment.status] || '#999' }}
                       >
-                        {payment.status}
+                        {statusLabels[payment.status] || payment.status}
                       </span>
                       {payment.created_at && (
                         <p className="text-xs text-tg-hint">

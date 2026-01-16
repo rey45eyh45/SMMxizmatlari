@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, CheckCircle, XCircle, Loader, RefreshCw } from 'lucide-react'
-import { Card, Loading, ErrorState, EmptyState, Button } from '../components'
-import { ordersAPI } from '../lib/api'
+import { Card, EmptyState, Button } from '../components'
+import { mockOrders } from '../lib/mockData'
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   pending: { icon: Clock, color: '#F59E0B', label: 'Kutilmoqda' },
@@ -15,34 +15,28 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; label: s
 }
 
 export default function Orders() {
-  const { data: orders, isLoading, error, refetch } = useQuery({
-    queryKey: ['my-orders'],
-    queryFn: () => ordersAPI.getMyOrders()
-  })
-
-  if (isLoading) return <Loading />
-  if (error) return <ErrorState onRetry={() => refetch()} />
+  const [orders] = useState(mockOrders)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-tg-text">Buyurtmalarim</h1>
-          <p className="text-tg-hint">{orders?.length || 0} ta buyurtma</p>
+          <p className="text-tg-hint">{orders.length} ta buyurtma</p>
         </div>
-        <Button variant="ghost" onClick={() => refetch()} icon={<RefreshCw size={18} />}>
+        <Button variant="ghost" onClick={() => {}} icon={<RefreshCw size={18} />}>
           Yangilash
         </Button>
       </div>
 
-      {orders?.length === 0 ? (
+      {orders.length === 0 ? (
         <EmptyState
           title="Buyurtmalar yo'q"
           description="Birinchi buyurtmangizni bering!"
         />
       ) : (
         <div className="space-y-3">
-          {orders?.map((order, index) => {
+          {orders.map((order, index) => {
             const status = statusConfig[order.status.toLowerCase()] || statusConfig.pending
             const StatusIcon = status.icon
 

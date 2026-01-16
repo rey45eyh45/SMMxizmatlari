@@ -1,23 +1,16 @@
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Copy, Users, Gift, Share2 } from 'lucide-react'
-import { Card, Loading, ErrorState, EmptyState } from '../components'
-import { userAPI } from '../lib/api'
+import { Card } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+import { mockReferralStats } from '../lib/mockData'
 
 export default function Referral() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
 
-  const { data: stats, isLoading, error, refetch } = useQuery({
-    queryKey: ['referral-stats'],
-    queryFn: userAPI.getReferralStats
-  })
-
-  if (isLoading) return <Loading />
-  if (error) return <ErrorState onRetry={() => refetch()} />
+  const stats = mockReferralStats
 
   const copyLink = () => {
-    if (stats?.referral_link) {
+    if (stats.referral_link) {
       navigator.clipboard.writeText(stats.referral_link)
       hapticFeedback.notification('success')
       showAlert('📋 Havola nusxalandi!')
@@ -25,7 +18,7 @@ export default function Referral() {
   }
 
   const shareLink = () => {
-    if (stats?.referral_link && tg) {
+    if (stats.referral_link && tg) {
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(stats.referral_link)}&text=${encodeURIComponent('📱 Eng arzon SMM xizmatlari! Ro\'yxatdan o\'ting va bonus oling!')}`)
     }
   }
@@ -133,7 +126,7 @@ export default function Referral() {
       </motion.div>
 
       {/* Referrals List */}
-      {stats?.referrals && stats.referrals.length > 0 && (
+      {stats.referrals && stats.referrals.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,7 +137,7 @@ export default function Referral() {
           </h2>
           
           <div className="space-y-2">
-            {stats.referrals.map((ref, index) => (
+            {(stats.referrals as any[]).map((ref, index) => (
               <Card key={ref.user_id} className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-tg-secondary-bg flex items-center justify-center text-tg-hint font-medium">
                   {index + 1}

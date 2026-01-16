@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Grid3X3, ShoppingBag, Wallet, User } from 'lucide-react'
+import { Home, Grid3X3, ShoppingBag, Wallet } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 
 const navItems = [
@@ -14,18 +14,24 @@ export default function BottomNav() {
   const location = useLocation()
   const { hapticFeedback } = useTelegram()
 
+  // Check if current path matches or starts with nav path
+  const isActivePath = (path: string) => {
+    if (path === '/') return location.pathname === '/'
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-tg-bg border-t border-tg-secondary-bg safe-bottom z-50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path
+          const isActive = isActivePath(item.path)
           const Icon = item.icon
           
           return (
             <NavLink
               key={item.path}
               to={item.path}
-              onClick={() => hapticFeedback.selection()}
+              onClick={() => hapticFeedback?.selection?.()}
               className="flex flex-col items-center justify-center w-full h-full relative"
             >
               <motion.div
@@ -37,15 +43,6 @@ export default function BottomNav() {
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                 <span className="text-[10px] mt-1 font-medium">{item.label}</span>
               </motion.div>
-              
-              {isActive && (
-                <motion.div
-                  layoutId="nav-indicator"
-                  className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tg-button rounded-full"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
             </NavLink>
           )
         })}

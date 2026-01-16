@@ -1,58 +1,58 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
-import { Check, AlertCircle, Info } from 'lucide-react'
-import { Button, Input, Card, Loading, ErrorState } from '../components'
-import { servicesAPI, ordersAPI } from '../lib/api'
-import { useAuthStore } from '../store'
+import { Check, AlertCircle, Info, ArrowLeft } from 'lucide-react'
+import { Button, Input, Card } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+import { mockServices, mockUser } from '../lib/mockData'
 
 export default function ServiceOrder() {
   const { serviceId } = useParams<{ serviceId: string }>()
   const navigate = useNavigate()
-  const { hapticFeedback, showAlert, mainButton } = useTelegram()
-  const { user, updateBalance } = useAuthStore()
+  const { hapticFeedback, showAlert } = useTelegram()
 
   const [link, setLink] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [isOrdering, setIsOrdering] = useState(false)
 
-  const { data: service, isLoading, error, refetch } = useQuery({
-    queryKey: ['service', serviceId],
-    queryFn: () => servicesAPI.getService(serviceId!),
-    enabled: !!serviceId
-  })
+  // Find service from mock data
+  const service = Object.values(mockServices).flat().find(s => s.id === serviceId)
 
-  const createOrderMutation = useMutation({
-    mutationFn: () => ordersAPI.create(serviceId!, link, parseInt(quantity)),
-    onSuccess: (order) => {
-      hapticFeedback.notification('success')
-      updateBalance(user!.balance - order.price)
-      showAlert(`✅ Buyurtma #${order.id} yaratildi!`)
-      navigate('/orders')
-    },
-    onError: (error: any) => {
-      hapticFeedback.notification('error')
-      showAlert(error.response?.data?.detail || 'Xatolik yuz berdi')
-    }
-  })
-
-  if (isLoading) return <Loading />
-  if (error || !service) return <ErrorState onRetry={() => refetch()} />
+  if (!service) {
+    return (
+      <div className="text-center py-10">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-tg-link mb-4"
+        >
+          <ArrowLeft size={20} />
+          <span>Orqaga</span>
+        </button>
+        <p className="text-tg-hint">Xizmat topilmadi</p>
+      </div>
+    )
+  }
 
   const qty = parseInt(quantity) || 0
   const totalPrice = Math.max(100, Math.floor((qty / 1000) * service.price_per_1000))
-  const balance = user?.balance || 0
+  const balance = mockUser.balance
   const canOrder = 
     link.length > 0 && 
     qty >= service.min_quantity && 
     qty <= service.max_quantity && 
     balance >= totalPrice
 
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (!canOrder) return
     hapticFeedback.impact('medium')
-    createOrderMutation.mutate()
+    setIsOrdering(true)
+    
+    // Simulate order creation
+    setTimeout(() => {
+      setIsOrdering(false)
+      hapticFeedback.notification('success')
+      showAlert(`✅ Buyurtma yaratildi!`)
+      navigate('/orders')
+    }, 1000)
   }
 
   return (
@@ -143,7 +143,7 @@ export default function ServiceOrder() {
         size="lg"
         onClick={handleOrder}
         disabled={!canOrder}
-        loading={createOrderMutation.isPending}
+        loading={isOrdering}
         icon={<Check size={20} />}
       >
         Buyurtma berish
