@@ -238,10 +238,19 @@ async def create_or_get_user(request: CreateUserRequest):
     }
 
 
-@app.get("/api/user/{user_id}")
-async def get_user_by_id(user_id: int):
-    """User ID bo'yicha foydalanuvchi ma'lumotlarini olish"""
-    user = get_user(user_id)
+@app.get("/api/user/by-phone/{phone}")
+async def get_user_by_phone_number(phone: str):
+    """Telefon raqam bo'yicha foydalanuvchi ma'lumotlarini olish"""
+    # Telefon raqamni tozalash (faqat raqamlar)
+    clean_phone = ''.join(filter(str.isdigit, phone))
+    
+    user = get_user_by_phone(clean_phone)
+    
+    if not user:
+        # +998 bilan ham tekshiramiz
+        if not clean_phone.startswith('998'):
+            clean_phone = '998' + clean_phone
+            user = get_user_by_phone(clean_phone)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -261,19 +270,10 @@ async def get_user_by_id(user_id: int):
     }
 
 
-@app.get("/api/user/by-phone/{phone}")
-async def get_user_by_phone_number(phone: str):
-    """Telefon raqam bo'yicha foydalanuvchi ma'lumotlarini olish"""
-    # Telefon raqamni tozalash (faqat raqamlar)
-    clean_phone = ''.join(filter(str.isdigit, phone))
-    
-    user = get_user_by_phone(clean_phone)
-    
-    if not user:
-        # +998 bilan ham tekshiramiz
-        if not clean_phone.startswith('998'):
-            clean_phone = '998' + clean_phone
-            user = get_user_by_phone(clean_phone)
+@app.get("/api/user/{user_id}")
+async def get_user_by_id(user_id: int):
+    """User ID bo'yicha foydalanuvchi ma'lumotlarini olish"""
+    user = get_user(user_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

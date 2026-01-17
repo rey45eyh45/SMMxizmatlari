@@ -33,51 +33,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // LocalStorage dan telefon raqamni olish
-  const getStoredPhone = (): string | null => {
+  // LocalStorage dan user_id olish
+  const getStoredUserId = (): number | null => {
     try {
-      return localStorage.getItem('smm_user_phone')
+      const stored = localStorage.getItem('smm_user_id')
+      return stored ? parseInt(stored) : null
     } catch {
       return null
     }
   }
 
-  // Telefon raqamni saqlash
-  const storePhone = (phone: string) => {
+  // User ID ni saqlash
+  const storeUserId = (userId: number) => {
     try {
-      localStorage.setItem('smm_user_phone', phone)
+      localStorage.setItem('smm_user_id', userId.toString())
     } catch {
-      console.log('Could not save phone to localStorage')
+      console.log('Could not save userId to localStorage')
     }
-  }
-
-  // Telegram WebApp orqali kontakt so'rash
-  const requestContact = async (): Promise<string | null> => {
-    return new Promise((resolve) => {
-      if (!tg || typeof tg.requestContact !== 'function') {
-        console.log('requestContact not available')
-        resolve(null)
-        return
-      }
-
-      try {
-        // @ts-ignore - Telegram WebApp types incomplete
-        tg.requestContact((ok: boolean, response?: any) => {
-          if (ok && response?.responseUnsafe?.contact?.phone_number) {
-            const phone = response.responseUnsafe.contact.phone_number
-            console.log('Got contact phone:', phone)
-            storePhone(phone)
-            resolve(phone)
-          } else {
-            console.log('Contact request failed or cancelled')
-            resolve(null)
-          }
-        })
-      } catch (err) {
-        console.error('requestContact error:', err)
-        resolve(null)
-      }
-    })
   }
 
   const authenticate = async () => {
@@ -85,7 +57,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true)
       setError(null)
 
-      // 1. initData mavjud bo'lsa - HMAC bilan validate qilish (eng ishonchli)
+      // 1. initData mavjud bo'lsa - HMAC bilan validate qilish (Open tugmasi)
       if (initData && initData.length > 0) {
         console.log('Authenticating with initData')
         setTelegramInitData(initData)
@@ -94,6 +66,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const response = await authAPI.authenticate(initData)
           if (response.success && response.user) {
             setUser(response.user)
+            storeUserId(response.user.user_id)
             setIsLoading(false)
             return
           }
@@ -102,75 +75,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
 
-      // 2. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish/yaratish
+      // 2. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish
       if (tgUser?.id) {
         console.log('Using tgUser ID:', tgUser.id)
         
         try {
-          // Avval mavjud userni olishga harakat
           const response = await userAPI.getById(tgUser.id)
           if (response.success && response.user) {
             setUser(response.user)
+            storeUserId(response.user.user_id)
             setIsLoading(false)
             return
           }
         } catch {
-          // User topilmadi - yangi yaratamiz
-          console.log('User not found, creating new user')
-        }
-
-        // Yangi user yaratish
-        try {
-          const newUser = await userAPI.createOrGet({
-            user_id: tgUser.id,
-            username: tgUser.username || '',
-            full_name: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || 'Foydalanuvchi'
-          })
-          if (newUser.success && newUser.user) {
-            setUser(newUser.user)
-            setIsLoading(false)
-            return
-          }
-        } catch (err) {
-          console.error('Failed to create user:', err)
+          console.log('User not found by tgUser.id')
         }
       }
 
-      // 3. LocalStorage da saqlangan telefon raqam bo'lsa - u orqali topish
-      const storedPhone = getStoredPhone()
-      if (storedPhone) {
-        console.log('Trying stored phone:', storedPhone)
+      // 3. LocalStorage da saqlangan user_id bo'lsa
+      const storedUserId = getStoredUserId()
+      if (storedUserId) {
+        console.log('Trying stored userId:', storedUserId)
         try {
-          const response = await userAPI.getByPhone(storedPhone)
+          const response = await userAPI.getById(storedUserId)
           if (response.success && response.user) {
             setUser(response.user)
             setIsLoading(false)
             return
           }
         } catch {
-          console.log('Stored phone lookup failed')
+          console.log('Stored userId lookup failed')
+          // Eskirgan ma'lumotni tozalash
+          localStorage.removeItem('smm_user_id')
         }
       }
 
-      // 4. Telegram WebApp kontakt so'rash (faqat Mini App ichida ishlaydi)
-      console.log('Requesting contact from Telegram...')
-      const contactPhone = await requestContact()
-      if (contactPhone) {
-        try {
-          const response = await userAPI.getByPhone(contactPhone)
-          if (response.success && response.user) {
-            setUser(response.user)
-            setIsLoading(false)
-            return
-          }
-        } catch {
-          console.log('Contact phone lookup failed')
-        }
-      }
-
-      // 5. Hech narsa ishlamasa - foydalanuvchi botda ro'yxatdan o'tmagan
+      // 4. Hech narsa ishlamasa - foydalanuvchi botda ro'yxatdan o'tmagan
       console.log('No user data available')
-      setError('Foydalanuvchi topilmadi. Iltimos, avval botda /start bosing.')
+      setError('Foydalanuvchi topilmadi. Iltimos, avval botda /start bosing va telefon raqamingizni yuboring.')
       
     } catch (err: any) {
       console.error('Auth error:', err)
