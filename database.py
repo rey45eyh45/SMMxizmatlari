@@ -26,7 +26,8 @@ def init_db():
     # phone ustuni mavjud bo'lmasa qo'shish
     try:
         cursor.execute('ALTER TABLE users ADD COLUMN phone TEXT')
-    except:
+        print("Phone ustuni qo'shildi")
+    except Exception as e:
         pass  # Ustun allaqachon mavjud
     
     # Buyurtmalar jadvali
