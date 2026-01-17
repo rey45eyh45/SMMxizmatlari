@@ -1028,7 +1028,7 @@ async def cmd_start(message: Message, state: FSMContext):
     user = get_user(user_id)
     balance = user[3] if user else 0
     
-    # Telefon raqam borligini tekshirish (9-chi ustun - phone)
+    # Telefon raqam borligini tekshirish (index 9 - phone)
     has_phone = user and len(user) > 9 and user[9]
     
     # Agar telefon raqam yo'q bo'lsa - so'rash
