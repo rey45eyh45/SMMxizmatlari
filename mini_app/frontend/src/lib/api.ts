@@ -11,8 +11,8 @@ import type {
   SMSCountry,
 } from '../types'
 
-// API URL - production'da same origin, local'da localhost:8000
-const API_URL = import.meta.env.VITE_API_URL || ''
+// API URL - same origin (server.js handles /api routes)
+const API_URL = ''
 
 // Telegram WebApp init data
 let telegramInitData = ''
