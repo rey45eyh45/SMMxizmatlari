@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 3000;
 // Bot config for sending receipts
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = process.env.ADMIN_ID || '';
+const BOT_API_URL = process.env.BOT_API_URL || 'https://smmxizmatlari-production.up.railway.app';
 
 // JSON parsing
 app.use(express.json());
@@ -136,10 +137,25 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Get user by ID
-app.get('/api/user/:userId', (req, res) => {
+// Get user by ID - from Bot API (main database)
+app.get('/api/user/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
   
+  try {
+    // Try to get from Bot API first (main database)
+    const botResponse = await axios.get(`${BOT_API_URL}/api/user/${userId}`, {
+      timeout: 5000
+    });
+    
+    if (botResponse.data.success) {
+      console.log('Got user from Bot API:', botResponse.data.user);
+      return res.json(botResponse.data);
+    }
+  } catch (err) {
+    console.log('Bot API error, falling back to local DB:', err.message);
+  }
+  
+  // Fallback to local database
   if (!db) {
     return res.status(500).json({ success: false, error: 'Database not available' });
   }
