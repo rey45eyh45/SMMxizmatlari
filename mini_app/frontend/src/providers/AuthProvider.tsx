@@ -111,11 +111,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return
           }
         } catch {
-          console.log('URL user_id lookup failed')
+          console.log('URL user_id lookup failed, creating user...')
+          // User topilmadi - yaratamiz
+          try {
+            const createResponse = await userAPI.createOrGet({
+              user_id: urlUserId,
+              username: tgUser?.username || '',
+              full_name: tgUser ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() : 'Foydalanuvchi'
+            })
+            if (createResponse.success && createResponse.user) {
+              setUser(createResponse.user)
+              storeUserId(createResponse.user.user_id)
+              setIsLoading(false)
+              return
+            }
+          } catch (createErr) {
+            console.log('Failed to create user from URL user_id')
+          }
         }
       }
 
-      // 3. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish
+      // 3. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish yoki yaratish
       if (tgUser?.id) {
         console.log('Using tgUser ID:', tgUser.id)
         
@@ -128,7 +144,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return
           }
         } catch {
-          console.log('User not found by tgUser.id')
+          console.log('User not found by tgUser.id, creating...')
+          // User topilmadi - yaratamiz
+          try {
+            const createResponse = await userAPI.createOrGet({
+              user_id: tgUser.id,
+              username: tgUser.username || '',
+              full_name: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || 'Foydalanuvchi'
+            })
+            if (createResponse.success && createResponse.user) {
+              setUser(createResponse.user)
+              storeUserId(createResponse.user.user_id)
+              setIsLoading(false)
+              return
+            }
+          } catch (createErr) {
+            console.log('Failed to create user from tgUser.id')
+          }
         }
       }
 
