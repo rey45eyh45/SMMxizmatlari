@@ -429,6 +429,56 @@ app.post('/api/premium/request', (req, res) => {
   }
 });
 
+// Get payment methods
+app.get('/api/payment/methods', (req, res) => {
+  const methods = [
+    { id: 'click', name: 'Click', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
+    { id: 'payme', name: 'Payme', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
+    { id: 'uzum', name: 'Uzum', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
+  ];
+  res.json({ success: true, methods });
+});
+
+// Create payment request
+app.post('/api/payment/create', (req, res) => {
+  const { user_id, amount, method } = req.body;
+  
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
+  }
+  
+  if (!user_id || !amount || !method) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+  
+  if (amount < 5000) {
+    return res.status(400).json({ success: false, error: 'Minimum amount is 5000' });
+  }
+  
+  try {
+    const now = new Date().toISOString();
+    db.run(`
+      INSERT INTO payments (user_id, amount, method, status, created_at)
+      VALUES (?, ?, ?, 'pending', ?)
+    `, [user_id, amount, method, now]);
+    
+    saveDb();
+    
+    // Get the created payment ID
+    const result = db.exec('SELECT last_insert_rowid() as id');
+    const paymentId = result.length ? result[0].values[0][0] : null;
+    
+    res.json({ 
+      success: true, 
+      message: 'Payment request created',
+      payment_id: paymentId
+    });
+  } catch (err) {
+    console.error('Error creating payment:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 

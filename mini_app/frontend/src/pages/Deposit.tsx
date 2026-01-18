@@ -1,46 +1,85 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Check, Copy, AlertCircle } from 'lucide-react'
 import { Card, Button, Input } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+import { useAuth } from '../providers'
 
 const quickAmounts = [10000, 25000, 50000, 100000, 250000, 500000]
 
-// Mock payment methods
-const mockPaymentMethods = [
-  { id: 'uzcard', name: 'UzCard', card_number: '8600 1234 5678 9012', card_holder: 'IDEAL SMM', min_amount: 5000 },
-  { id: 'humo', name: 'Humo', card_number: '9860 1234 5678 9012', card_holder: 'IDEAL SMM', min_amount: 5000 },
-]
+interface PaymentMethod {
+  id: string
+  name: string
+  card_number: string
+  card_holder: string
+  min_amount: number
+}
 
 export default function Deposit() {
   const navigate = useNavigate()
   const { hapticFeedback, showAlert } = useTelegram()
+  const { user } = useAuth()
   
   const [amount, setAmount] = useState('')
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
   const [step, setStep] = useState<'amount' | 'method' | 'confirm'>('amount')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [methods, setMethods] = useState<PaymentMethod[]>([])
 
-  const methods = mockPaymentMethods
+  useEffect(() => {
+    // Fetch payment methods
+    fetch('/api/payment/methods')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.methods) {
+          setMethods(data.methods)
+        }
+      })
+      .catch(err => console.error('Error fetching methods:', err))
+  }, [])
+
   const currentMethod = methods.find(m => m.id === selectedMethod)
   const parsedAmount = parseInt(amount) || 0
   const minAmount = methods[0]?.min_amount || 5000
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text.replace(/\s/g, ''))
-    hapticFeedback.notification('success')
-    showAlert('📋 Karta raqami nusxalandi!')
+    hapticFeedback?.notification?.('success')
+    showAlert?.('📋 Karta raqami nusxalandi!')
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (!user?.user_id || !selectedMethod) return
+    
     setIsSubmitting(true)
-    setTimeout(() => {
+    
+    try {
+      const response = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          amount: parsedAmount,
+          method: selectedMethod
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        hapticFeedback?.notification?.('success')
+        showAlert?.(`✅ To'lov so'rovi #${data.payment_id} yaratildi!\n\nAdmin 5-30 daqiqa ichida tekshirib tasdiqlaydi.`)
+        navigate('/balance')
+      } else {
+        showAlert?.('❌ Xatolik: ' + (data.error || 'Noma\'lum xatolik'))
+      }
+    } catch (error) {
+      console.error('Error creating payment:', error)
+      showAlert?.('❌ Xatolik yuz berdi')
+    } finally {
       setIsSubmitting(false)
-      hapticFeedback.notification('success')
-      showAlert(`✅ To'lov so'rovi yaratildi! Admin tasdiqlashini kuting.`)
-      navigate('/balance')
-    }, 1000)
+    }
   }
 
   return (
@@ -74,7 +113,7 @@ export default function Deposit() {
                 <button
                   key={amt}
                   onClick={() => {
-                    hapticFeedback.selection()
+                    hapticFeedback?.selection?.()
                     setAmount(amt.toString())
                   }}
                   className={`
@@ -95,7 +134,7 @@ export default function Deposit() {
             size="lg"
             disabled={parsedAmount < minAmount}
             onClick={() => {
-              hapticFeedback.impact('medium')
+              hapticFeedback?.impact?.('medium')
               setStep('method')
             }}
           >
@@ -123,7 +162,7 @@ export default function Deposit() {
               <Card
                 key={method.id}
                 onClick={() => {
-                  hapticFeedback.selection()
+                  hapticFeedback?.selection?.()
                   setSelectedMethod(method.id)
                 }}
                 className={`cursor-pointer transition-all ${
@@ -158,7 +197,7 @@ export default function Deposit() {
             <Button
               disabled={!selectedMethod}
               onClick={() => {
-                hapticFeedback.impact('medium')
+                hapticFeedback?.impact?.('medium')
                 setStep('confirm')
               }}
               className="flex-1"
