@@ -445,6 +445,8 @@ app.get('/api/payment/methods', (req, res) => {
 app.post('/api/payment/create', (req, res) => {
   const { user_id, amount, method } = req.body;
   
+  console.log('Creating payment:', { user_id, amount, method });
+  
   if (!db) {
     return res.status(500).json({ success: false, error: 'Database not available' });
   }
@@ -466,9 +468,15 @@ app.post('/api/payment/create', (req, res) => {
     
     saveDb();
     
-    // Get the created payment ID
-    const result = db.exec('SELECT last_insert_rowid() as id');
-    const paymentId = result.length ? result[0].values[0][0] : null;
+    // Get the created payment ID - sql.js specific way
+    const result = db.exec('SELECT MAX(id) as id FROM payments WHERE user_id = ?', [user_id]);
+    let paymentId = 0;
+    
+    if (result.length && result[0].values.length) {
+      paymentId = result[0].values[0][0];
+    }
+    
+    console.log('Payment created with ID:', paymentId);
     
     res.json({ 
       success: true, 
@@ -477,7 +485,7 @@ app.post('/api/payment/create', (req, res) => {
     });
   } catch (err) {
     console.error('Error creating payment:', err);
-    res.status(500).json({ success: false, error: 'Database error' });
+    res.status(500).json({ success: false, error: 'Database error: ' + err.message });
   }
 });
 
