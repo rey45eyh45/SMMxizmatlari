@@ -14,7 +14,8 @@ const PORT = process.env.PORT || 3000;
 // Bot config for sending receipts
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = process.env.ADMIN_ID || '';
-const BOT_API_URL = process.env.BOT_API_URL || 'https://smmxizmatlari-production.up.railway.app';
+// Railway private networking - no port needed, Railway handles it
+const BOT_API_URL = process.env.BOT_API_URL || 'http://smmxizmatlari.railway.internal';
 
 // JSON parsing
 app.use(express.json());
@@ -641,5 +642,6 @@ initDb().then(() => {
     console.log(`Server running on port ${PORT}`);
     console.log('BOT_TOKEN:', BOT_TOKEN ? 'Set (' + BOT_TOKEN.substring(0, 10) + '...)' : 'NOT SET');
     console.log('ADMIN_ID:', ADMIN_ID || 'NOT SET');
+    console.log('BOT_API_URL:', BOT_API_URL || 'NOT SET');
   });
 });
