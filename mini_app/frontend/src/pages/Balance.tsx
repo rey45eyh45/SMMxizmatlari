@@ -55,9 +55,9 @@ export default function Balance() {
           </p>
           
           <Button
-            variant="secondary"
+            variant="primary"
             fullWidth
-            className="mt-6 bg-white text-tg-button hover:bg-white/90"
+            className="mt-6 !bg-white !text-blue-600 hover:!bg-gray-100 font-semibold"
             icon={<Plus size={20} />}
             onClick={() => {
               hapticFeedback?.impact?.('medium')
