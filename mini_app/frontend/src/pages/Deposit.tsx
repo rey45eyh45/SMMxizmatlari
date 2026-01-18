@@ -89,9 +89,6 @@ export default function Deposit() {
       tg.openTelegramLink(`https://t.me/SmmXizmatlari_bot?start=receipt_${paymentId}`)
     }
   }
-      setIsSubmitting(false)
-    }
-  }
 
   return (
     <div className="space-y-6">
