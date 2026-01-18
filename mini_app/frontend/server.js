@@ -48,6 +48,19 @@ async function initDb() {
       )
     `);
     
+    // Payments table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount REAL,
+        method TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT,
+        admin_note TEXT
+      )
+    `);
+    
     saveDb();
     return true;
   } catch (err) {
@@ -229,6 +242,36 @@ app.post('/api/auth', (req, res) => {
   } catch (err) {
     console.error('Auth error:', err);
     res.status(500).json({ success: false, error: 'Auth failed' });
+  }
+});
+
+// Get user payments
+app.get('/api/payments/:userId', (req, res) => {
+  const userId = parseInt(req.params.userId);
+  
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
+  }
+  
+  try {
+    const result = db.exec('SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC', [userId]);
+    
+    const payments = [];
+    if (result.length && result[0].values.length) {
+      const columns = ['id', 'user_id', 'amount', 'method', 'status', 'created_at', 'admin_note'];
+      result[0].values.forEach(row => {
+        const payment = {};
+        row.forEach((val, idx) => {
+          payment[columns[idx]] = val;
+        });
+        payments.push(payment);
+      });
+    }
+    
+    res.json({ success: true, payments });
+  } catch (err) {
+    console.error('Error getting payments:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
   }
 });
 

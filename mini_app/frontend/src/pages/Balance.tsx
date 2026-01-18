@@ -5,35 +5,36 @@ import { Plus, History, TrendingUp, CreditCard } from 'lucide-react'
 import { Card, Button, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
-import { paymentsAPI } from '../lib/api'
-import { mockPayments } from '../lib/mockData'
 import type { Payment } from '../types'
 
 export default function Balance() {
   const navigate = useNavigate()
   const { hapticFeedback } = useTelegram()
   const { user, isLoading: authLoading } = useAuth()
-  const [payments, setPayments] = useState<Payment[]>(mockPayments)
+  const [payments, setPayments] = useState<Payment[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const balance = user?.balance || 0
 
   useEffect(() => {
     const fetchPayments = async () => {
+      if (!user?.user_id) return
+      
       try {
         setIsLoading(true)
-        const data = await paymentsAPI.getMyPayments()
-        if (data.payments && data.payments.length > 0) {
+        const response = await fetch(`/api/payments/${user.user_id}`)
+        const data = await response.json()
+        if (data.success && data.payments) {
           setPayments(data.payments)
         }
       } catch (error) {
-        console.log('Using mock payments')
+        console.error('Error fetching payments:', error)
       } finally {
         setIsLoading(false)
       }
     }
     fetchPayments()
-  }, [])
+  }, [user?.user_id])
 
   if (authLoading || isLoading) {
     return <Loading />
