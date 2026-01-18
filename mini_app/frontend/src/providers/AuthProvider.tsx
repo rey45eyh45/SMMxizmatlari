@@ -42,8 +42,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return parseInt(userId)
       }
       // Telegram startParam ham tekshiramiz
-      if (tg?.initDataUnsafe?.start_param) {
-        const match = tg.initDataUnsafe.start_param.match(/user_(\d+)/)
+      // @ts-ignore - Telegram WebApp types incomplete
+      const startParam = tg?.initDataUnsafe?.start_param
+      if (startParam) {
+        const match = startParam.match(/user_(\d+)/)
         if (match) {
           return parseInt(match[1])
         }
