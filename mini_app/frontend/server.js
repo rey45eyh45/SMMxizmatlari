@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import initSqlJs from 'sql.js';
 import fs from 'fs';
+import axios from 'axios';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -550,18 +551,23 @@ app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, re
       contentType: file.mimetype
     });
     
-    console.log('Sending to Telegram...');
+    console.log('Sending to Telegram via axios...');
     
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-      method: 'POST',
-      body: formData,
-      headers: formData.getHeaders()
-    });
+    const response = await axios.post(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders()
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      }
+    );
     
-    const result = await response.json();
-    console.log('Telegram response:', result);
+    console.log('Telegram response:', response.data);
     
-    if (result.ok) {
+    if (response.data.ok) {
       // Update payment status
       if (db) {
         db.run('UPDATE payments SET status = ? WHERE id = ?', ['receipt_sent', payment_id]);
@@ -570,12 +576,12 @@ app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, re
       
       res.json({ success: true, message: 'Receipt sent to admin' });
     } else {
-      console.error('Telegram API error:', result);
-      res.status(500).json({ success: false, error: result.description || 'Failed to send receipt' });
+      console.error('Telegram API error:', response.data);
+      res.status(500).json({ success: false, error: response.data.description || 'Failed to send receipt' });
     }
   } catch (err) {
-    console.error('Error uploading receipt:', err);
-    res.status(500).json({ success: false, error: 'Server error: ' + err.message });
+    console.error('Error uploading receipt:', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Server error: ' + (err.response?.data?.description || err.message) });
   }
 });
 
