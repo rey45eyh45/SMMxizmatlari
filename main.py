@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.enums import ParseMode
-from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultArticle, InputTextMessageContent
+from aiogram.types import Message, CallbackQuery, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -1053,7 +1053,14 @@ async def cmd_start(message: Message, state: FSMContext):
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
+    # Inline tugma - Mini App uchun (cache muammosidan qochish)
+    from keyboards_v3 import MINI_APP_URL
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Mini App ochish", web_app=WebAppInfo(url=f"{MINI_APP_URL}?user_id={user_id}"))]
+    ])
+    
     await message.answer(welcome_text, reply_markup=main_menu(user_id))
+    await message.answer("🚀 <b>Mini App</b> - qulay interfeys:", reply_markup=inline_kb)
 
 
 # Telefon raqam qabul qilish
