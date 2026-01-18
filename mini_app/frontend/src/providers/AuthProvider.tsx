@@ -33,6 +33,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // URL dan user_id olish
+  const getUserIdFromUrl = (): number | null => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const userId = params.get('user_id')
+      if (userId) {
+        return parseInt(userId)
+      }
+      // Telegram startParam ham tekshiramiz
+      if (tg?.initDataUnsafe?.start_param) {
+        const match = tg.initDataUnsafe.start_param.match(/user_(\d+)/)
+        if (match) {
+          return parseInt(match[1])
+        }
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+
   // LocalStorage dan user_id olish
   const getStoredUserId = (): number | null => {
     try {
@@ -75,7 +96,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
 
-      // 2. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish
+      // 2. URL dan user_id olish (Mini App ochish tugmasi)
+      const urlUserId = getUserIdFromUrl()
+      if (urlUserId) {
+        console.log('Using URL user_id:', urlUserId)
+        try {
+          const response = await userAPI.getById(urlUserId)
+          if (response.success && response.user) {
+            setUser(response.user)
+            storeUserId(response.user.user_id)
+            setIsLoading(false)
+            return
+          }
+        } catch {
+          console.log('URL user_id lookup failed')
+        }
+      }
+
+      // 3. initDataUnsafe.user mavjud bo'lsa - user_id bo'yicha olish
       if (tgUser?.id) {
         console.log('Using tgUser ID:', tgUser.id)
         
@@ -92,7 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
 
-      // 3. LocalStorage da saqlangan user_id bo'lsa
+      // 4. LocalStorage da saqlangan user_id bo'lsa
       const storedUserId = getStoredUserId()
       if (storedUserId) {
         console.log('Trying stored userId:', storedUserId)
@@ -105,14 +143,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } catch {
           console.log('Stored userId lookup failed')
-          // Eskirgan ma'lumotni tozalash
           localStorage.removeItem('smm_user_id')
         }
       }
 
-      // 4. Hech narsa ishlamasa - foydalanuvchi botda ro'yxatdan o'tmagan
+      // 5. Hech narsa ishlamasa - foydalanuvchi botda ro'yxatdan o'tmagan
       console.log('No user data available')
-      setError('Foydalanuvchi topilmadi. Iltimos, avval botda /start bosing va telefon raqamingizni yuboring.')
+      setError('Foydalanuvchi topilmadi. Iltimos, avval botda /start bosing.')
       
     } catch (err: any) {
       console.error('Auth error:', err)

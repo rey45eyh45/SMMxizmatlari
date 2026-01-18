@@ -19,7 +19,7 @@ def phone_request_keyboard():
     return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 
-def main_menu():
+def main_menu(user_id: int = None):
     """Asosiy menyu"""
     builder = ReplyKeyboardBuilder()
     builder.row(KeyboardButton(text="📁 Xizmatlar"))
@@ -31,10 +31,13 @@ def main_menu():
         KeyboardButton(text="💰 Mening hisobim"),
         KeyboardButton(text="💵 Hisob to'ldirish")
     )
-    # Mini App tugmasi
+    # Mini App tugmasi - user_id bilan
+    mini_app_url = MINI_APP_URL
+    if user_id:
+        mini_app_url = f"{MINI_APP_URL}?user_id={user_id}"
     builder.row(KeyboardButton(
         text="📱 Mini App ochish", 
-        web_app=WebAppInfo(url=MINI_APP_URL)
+        web_app=WebAppInfo(url=mini_app_url)
     ))
     return builder.as_markup(resize_keyboard=True)
 

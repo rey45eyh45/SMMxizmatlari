@@ -1028,25 +1028,7 @@ async def cmd_start(message: Message, state: FSMContext):
     user = get_user(user_id)
     balance = user[3] if user else 0
     
-    # Telefon raqam borligini tekshirish (index 9 - phone)
-    has_phone = user and len(user) > 9 and user[9]
-    
-    # Agar telefon raqam yo'q bo'lsa - so'rash
-    if not has_phone:
-        from keyboards_v3 import phone_request_keyboard
-        
-        text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
-        text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
-        text += f"👋 Assalomu alaykum, <b>{full_name}</b>!\n\n"
-        text += "📱 <b>Ro'yxatdan o'tish uchun telefon raqamingizni yuboring.</b>\n\n"
-        text += "Bu Mini App dan foydalanish uchun kerak bo'ladi."
-        
-        await message.answer(text, reply_markup=phone_request_keyboard())
-        await state.set_state(RegistrationState.waiting_for_phone)
-        await state.update_data(referral_id=referral_id, bonus_given=bonus_given)
-        return
-    
-    # Telefon bor - asosiy menyuga
+    # Asosiy menyu
     welcome_text = "🎯 <b>SMM XIZMATLARI | 24/7</b>\n"
     welcome_text += "━━━━━━━━━━━━━━━━━━━━━\n\n"
     
@@ -1071,7 +1053,7 @@ async def cmd_start(message: Message, state: FSMContext):
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
-    await message.answer(welcome_text, reply_markup=main_menu())
+    await message.answer(welcome_text, reply_markup=main_menu(user_id))
 
 
 # Telefon raqam qabul qilish
@@ -1125,7 +1107,7 @@ async def process_phone_contact(message: Message, state: FSMContext):
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
-    await message.answer(welcome_text, reply_markup=main_menu())
+    await message.answer(welcome_text, reply_markup=main_menu(message.from_user.id))
 
 
 # O'tkazib yuborish
@@ -1153,7 +1135,7 @@ async def skip_phone(message: Message, state: FSMContext):
     welcome_text += "⚠️ <i>Mini App dan foydalanish uchun /start bosib telefon raqamingizni yuboring.</i>\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
-    await message.answer(welcome_text, reply_markup=main_menu())
+    await message.answer(welcome_text, reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(Command("help"))
@@ -1172,7 +1154,7 @@ async def cmd_help(message: Message):
     text += "3️⃣ Havola va miqdorni kiriting\n"
     text += "4️⃣ Buyurtma avtomatik bajariladi\n"
     
-    await message.answer(text, reply_markup=main_menu())
+    await message.answer(text, reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(Command("balance"))
@@ -1185,7 +1167,7 @@ async def cmd_balance(message: Message):
     text += f"💳 Sizning balansingiz: <b>{balance:,.0f}</b> so'm\n\n"
     text += "💵 Balansni to'ldirish uchun \"💵 Hisob to'ldirish\" tugmasini bosing."
     
-    await message.answer(text, reply_markup=main_menu())
+    await message.answer(text, reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(Command("orders"))
@@ -1194,7 +1176,7 @@ async def cmd_orders(message: Message):
     orders = get_user_orders(user_id)
     
     if not orders:
-        await message.answer("📭 <b>Buyurtmalaringiz yo'q!</b>\n\nBirinchi buyurtmangizni bering.", reply_markup=main_menu())
+        await message.answer("📭 <b>Buyurtmalaringiz yo'q!</b>\n\nBirinchi buyurtmangizni bering.", reply_markup=main_menu(message.from_user.id))
         return
     
     text = "📦 <b>BUYURTMALARIM</b>\n"
@@ -1220,7 +1202,7 @@ async def cmd_orders(message: Message):
         text += f"├ 📊 {qty:,} ta | 💰 {price:,.0f} so'm\n"
         text += f"└ {status_emoji}\n\n"
     
-    await message.answer(text, reply_markup=main_menu())
+    await message.answer(text, reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(Command("referral"))
@@ -1514,7 +1496,7 @@ async def tiktok_menu(message: Message):
 @router.message(F.text == "⬅️ Orqaga")
 async def back_to_main(message: Message):
     """Asosiy menyuga qaytish"""
-    await message.answer("🏠 Asosiy menyu", reply_markup=main_menu())
+    await message.answer("🏠 Asosiy menyu", reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(F.text == "💰 Mening hisobim")
@@ -3836,7 +3818,7 @@ async def ref_copy_link_callback(call: CallbackQuery):
 @router.message(F.text.in_(["🏠 Bosh menyu", "⬅️ Orqaga"]))
 async def main_menu_handler(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("👇 Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu())
+    await message.answer("👇 Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(F.text == "📱 Virtual raqamlar")
@@ -3981,7 +3963,7 @@ async def payment_screenshot_photo(message: Message, state: FSMContext):
     
     await message.answer(
         "✅ <b>To'lov cheki yuborildi!</b>\n\nAdmin tekshirib, balansingizni to'ldiradi.\nOdatda 5-30 daqiqa ichida.",
-        reply_markup=main_menu()
+        reply_markup=main_menu(message.from_user.id)
     )
     await state.clear()
 
@@ -4009,7 +3991,7 @@ async def payment_screenshot_document(message: Message, state: FSMContext):
     
     await message.answer(
         "✅ <b>To'lov cheki yuborildi!</b>\n\nAdmin tekshirib, balansingizni to'ldiradi.\nOdatda 5-30 daqiqa ichida.",
-        reply_markup=main_menu()
+        reply_markup=main_menu(message.from_user.id)
     )
     await state.clear()
 
@@ -4168,7 +4150,7 @@ async def process_premium_phone_text(message: Message, state: FSMContext):
     """Telefon raqam - matn orqali"""
     if message.text == "❌ Bekor qilish":
         await state.clear()
-        await message.answer("❌ Premium obuna bekor qilindi.", reply_markup=main_menu())
+        await message.answer("❌ Premium obuna bekor qilindi.", reply_markup=main_menu(message.from_user.id))
         return
     
     # Telefon raqamni tekshirish
@@ -4208,7 +4190,7 @@ async def process_premium_phone(message: Message, state: FSMContext, phone: str)
             f"❌ <b>Balansingiz yetarli emas!</b>\n\n"
             f"💰 Kerak: {price:,} so'm\n"
             f"👛 Balans: {balance:,.0f} so'm",
-            reply_markup=main_menu()
+            reply_markup=main_menu(message.from_user.id)
         )
         await state.clear()
         return
@@ -4237,7 +4219,7 @@ async def process_premium_phone(message: Message, state: FSMContext, phone: str)
     
     success_text += "✅ Faollashtirilganda xabar beriladi."
     
-    await message.answer(success_text, reply_markup=main_menu())
+    await message.answer(success_text, reply_markup=main_menu(message.from_user.id))
     
     # Adminga xabar
     admin_text = "⭐ <b>YANGI PREMIUM SO'ROV!</b>\n"
@@ -4628,7 +4610,7 @@ async def process_link(message: Message, state: FSMContext):
     
     if "Bekor" in link or "bekor" in link:
         await state.clear()
-        await message.answer("❌ Bekor qilindi.", reply_markup=main_menu())
+        await message.answer("❌ Bekor qilindi.", reply_markup=main_menu(message.from_user.id))
         return
     
     if not link.startswith(("http://", "https://", "t.me/", "@")):
@@ -4653,7 +4635,7 @@ async def process_quantity(message: Message, state: FSMContext):
     
     if "Bekor" in text or "bekor" in text:
         await state.clear()
-        await message.answer("❌ Bekor qilindi.", reply_markup=main_menu())
+        await message.answer("❌ Bekor qilindi.", reply_markup=main_menu(message.from_user.id))
         return
     
     data = await state.get_data()
@@ -4736,7 +4718,7 @@ async def confirm_order_callback(call: CallbackQuery, state: FSMContext):
 async def cancel_order_callback(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("❌ Buyurtma bekor qilindi.")
-    await call.message.answer("👇 Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu())
+    await call.message.answer("👇 Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu(call.from_user.id))
     await call.answer()
 
 
@@ -4744,7 +4726,7 @@ async def cancel_order_callback(call: CallbackQuery, state: FSMContext):
 async def cancel_payment_callback(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("To'lov bekor qilindi.")
-    await call.message.answer("Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu())
+    await call.message.answer("Quyidagi tugmalardan birini tanlang:", reply_markup=main_menu(call.from_user.id))
     await call.answer()
 
 
