@@ -4,54 +4,30 @@ import { Copy, Users, Gift, Share2 } from 'lucide-react'
 import { Card, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
-import { userAPI } from '../lib/api'
-import { mockReferralStats } from '../lib/mockData'
-import type { ReferralStats } from '../types'
 
 export default function Referral() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
-  const { user } = useAuth()
-  const [stats, setStats] = useState<ReferralStats>(mockReferralStats)
-  const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setIsLoading(true)
-        const data = await userAPI.getReferralStats()
-        setStats(data)
-      } catch (error) {
-        // Use user data for referral stats
-        if (user) {
-          setStats({
-            referral_count: user.referral_count || 0,
-            referral_earnings: user.referral_earnings || 0,
-            referral_link: `https://t.me/SmmXizmatlari_bot?start=ref${user.user_id}`,
-            referrals: []
-          })
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchStats()
-  }, [user])
+  const { user, isLoading } = useAuth()
+  
+  const referralLink = user ? `https://t.me/SmmXizmatlari_bot?start=ref${user.user_id}` : ''
+  const referralCount = user?.referral_count || 0
+  const referralEarnings = user?.referral_earnings || 0
 
   if (isLoading) {
     return <Loading />
   }
 
   const copyLink = () => {
-    if (stats.referral_link) {
-      navigator.clipboard.writeText(stats.referral_link)
-      hapticFeedback.notification('success')
-      showAlert('📋 Havola nusxalandi!')
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink)
+      hapticFeedback?.notification?.('success')
+      showAlert?.('📋 Havola nusxalandi!')
     }
   }
 
   const shareLink = () => {
-    if (stats.referral_link && tg) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(stats.referral_link)}&text=${encodeURIComponent('📱 Eng arzon SMM xizmatlari! Ro\'yxatdan o\'ting va bonus oling!')}`)
+    if (referralLink && tg) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent('📱 Eng arzon SMM xizmatlari! Ro\'yxatdan o\'ting va bonus oling!')}`)
     }
   }
 
@@ -75,7 +51,7 @@ export default function Referral() {
             </div>
             <div>
               <p className="text-white/80 text-sm">Referallar</p>
-              <p className="text-2xl font-bold">{stats?.referral_count || 0}</p>
+              <p className="text-2xl font-bold">{referralCount}</p>
             </div>
           </div>
         </Card>
@@ -88,7 +64,7 @@ export default function Referral() {
             <div>
               <p className="text-white/80 text-sm">Daromad</p>
               <p className="text-2xl font-bold">
-                {(stats?.referral_earnings || 0).toLocaleString()}
+                {referralEarnings.toLocaleString()}
               </p>
             </div>
           </div>
@@ -106,7 +82,7 @@ export default function Referral() {
           
           <div className="bg-tg-bg rounded-xl p-3 flex items-center gap-2">
             <p className="flex-1 text-sm text-tg-text truncate font-mono">
-              {stats?.referral_link}
+              {referralLink}
             </p>
             <button
               onClick={copyLink}
@@ -157,36 +133,20 @@ export default function Referral() {
         </div>
       </motion.div>
 
-      {/* Referrals List */}
-      {stats.referrals && stats.referrals.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h2 className="text-lg font-semibold text-tg-text mb-3">
-            Referallaringiz
-          </h2>
-          
-          <div className="space-y-2">
-            {(stats.referrals as any[]).map((ref, index) => (
-              <Card key={ref.user_id} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-tg-secondary-bg flex items-center justify-center text-tg-hint font-medium">
-                  {index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-tg-text truncate">
-                    {ref.full_name || ref.username || `User ${ref.user_id}`}
-                  </p>
-                  <p className="text-sm text-tg-hint">
-                    {new Date(ref.created_at).toLocaleDateString('uz-UZ')}
-                  </p>
-                </div>
-              </Card>
-            ))}
+      {/* Bonus info */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Card className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+          <div className="text-center">
+            <p className="text-white/80">Har bir referal uchun</p>
+            <p className="text-3xl font-bold mt-1">1,000 so'm</p>
+            <p className="text-white/80 text-sm mt-1">bonus oling!</p>
           </div>
-        </motion.div>
-      )}
+        </Card>
+      </motion.div>
     </div>
   )
 }

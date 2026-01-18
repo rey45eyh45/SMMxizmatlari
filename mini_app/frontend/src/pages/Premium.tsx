@@ -1,37 +1,108 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Star, Sparkles } from 'lucide-react'
-import { Card } from '../components'
+import { Card, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
+import { useAuth } from '../providers'
 
-// Mock premium plans
-const mockPlans = [
-  { months: 1, price: 100000, original_price: 120000, discount_percent: 17, popular: false, best_value: false },
-  { months: 3, price: 270000, original_price: 360000, discount_percent: 25, popular: true, best_value: false },
-  { months: 6, price: 480000, original_price: 720000, discount_percent: 33, popular: false, best_value: true },
-  { months: 12, price: 850000, original_price: 1440000, discount_percent: 41, popular: false, best_value: false },
-]
+interface PremiumPlan {
+  months: number
+  price: number
+  original_price: number
+  discount_percent: number
+  popular: boolean
+  best_value: boolean
+}
 
-// Mock premium status
-const mockPremiumStatus = {
-  is_premium: false,
-  days_left: 0
+interface PremiumStatus {
+  is_premium: boolean
+  days_left: number
+  expires_at?: string
 }
 
 export default function Premium() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
+  const { user } = useAuth()
+  const [plans, setPlans] = useState<PremiumPlan[]>([])
+  const [status, setStatus] = useState<PremiumStatus>({ is_premium: false, days_left: 0 })
+  const [isLoading, setIsLoading] = useState(true)
+  const [requesting, setRequesting] = useState(false)
 
-  const plans = mockPlans
-  const status = mockPremiumStatus
-
-  const handleSelectPlan = (months: number, price: number) => {
-    hapticFeedback.impact('medium')
-    
-    // Open bot chat with premium command
-    if (tg) {
-      tg.openTelegramLink(`https://t.me/idealsmm_bot?start=premium_${months}`)
-    } else {
-      showAlert(`Premium ${months} oylik - ${price.toLocaleString()} so'm. Botda davom eting.`)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Fetch plans
+        const plansRes = await fetch('/api/premium/plans')
+        const plansData = await plansRes.json()
+        if (plansData.success) {
+          setPlans(plansData.plans)
+        }
+        
+        // Fetch status
+        if (user?.user_id) {
+          const statusRes = await fetch(`/api/premium/${user.user_id}`)
+          const statusData = await statusRes.json()
+          if (statusData.success) {
+            setStatus(statusData)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching premium data:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
+    
+    fetchData()
+  }, [user?.user_id])
+
+  const handleSelectPlan = async (months: number, price: number) => {
+    hapticFeedback?.impact?.('medium')
+    
+    if (!user?.user_id) {
+      showAlert?.('Xatolik: Foydalanuvchi aniqlanmadi')
+      return
+    }
+    
+    // Check balance
+    if ((user.balance || 0) < price) {
+      showAlert?.(`Balans yetarli emas! Kerakli: ${price.toLocaleString()} so'm`)
+      return
+    }
+    
+    setRequesting(true)
+    
+    try {
+      const response = await fetch('/api/premium/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          months,
+          price
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        hapticFeedback?.notification?.('success')
+        showAlert?.(`✅ So'rov yuborildi!\n\n${months} oylik Premium - ${price.toLocaleString()} so'm\n\nAdmin 24 soat ichida faollashtiradi.`)
+      } else {
+        showAlert?.('Xatolik yuz berdi')
+      }
+    } catch (error) {
+      console.error('Error requesting premium:', error)
+      showAlert?.('Xatolik yuz berdi')
+    } finally {
+      setRequesting(false)
+    }
+  }
+
+  if (isLoading) {
+    return <Loading />
   }
 
   return (
@@ -117,12 +188,12 @@ export default function Premium() {
             transition={{ delay: 0.2 + index * 0.1 }}
           >
             <Card
-              onClick={() => handleSelectPlan(plan.months, plan.price)}
+              onClick={() => !requesting && handleSelectPlan(plan.months, plan.price)}
               className={`cursor-pointer transition-all ${
                 plan.popular || plan.best_value 
                   ? 'ring-2 ring-yellow-400' 
                   : ''
-              }`}
+              } ${requesting ? 'opacity-50' : ''}`}
             >
               {(plan.popular || plan.best_value) && (
                 <div className="flex items-center gap-1 text-yellow-600 text-xs font-bold mb-2">
@@ -136,7 +207,7 @@ export default function Premium() {
                   <p className="font-semibold text-tg-text text-lg">
                     {plan.months} oylik
                   </p>
-                  {plan.original_price && plan.discount_percent && plan.discount_percent > 0 && (
+                  {plan.original_price && plan.discount_percent > 0 && (
                     <p className="text-sm text-tg-hint line-through">
                       {plan.original_price.toLocaleString()} so'm
                     </p>
@@ -147,7 +218,7 @@ export default function Premium() {
                   <p className="text-xl font-bold text-tg-button">
                     {plan.price.toLocaleString()} so'm
                   </p>
-                  {plan.discount_percent && plan.discount_percent > 0 && (
+                  {plan.discount_percent > 0 && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                       -{plan.discount_percent}%
                     </span>
@@ -159,9 +230,16 @@ export default function Premium() {
         ))}
       </motion.div>
 
+      {/* Balance info */}
+      <Card className="bg-tg-secondary-bg">
+        <p className="text-tg-hint text-sm text-center">
+          💰 Balansingiz: <span className="font-semibold text-tg-text">{(user?.balance || 0).toLocaleString()} so'm</span>
+        </p>
+      </Card>
+
       {/* Note */}
       <p className="text-center text-tg-hint text-sm">
-        Obuna 24 soat ichida faollashtiriladi
+        ⏱ Obuna 24 soat ichida admin tomonidan faollashtiriladi
       </p>
     </div>
   )

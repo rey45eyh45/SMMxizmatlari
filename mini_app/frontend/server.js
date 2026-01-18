@@ -61,6 +61,39 @@ async function initDb() {
       )
     `);
     
+    // Orders table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        service_id TEXT,
+        service_name TEXT,
+        link TEXT,
+        quantity INTEGER,
+        price REAL,
+        status TEXT DEFAULT 'pending',
+        api_order_id TEXT,
+        start_count INTEGER,
+        remains INTEGER,
+        created_at TEXT
+      )
+    `);
+    
+    // Premium table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS premium_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        months INTEGER,
+        price REAL,
+        status TEXT DEFAULT 'pending',
+        activated_at TEXT,
+        expires_at TEXT,
+        created_at TEXT,
+        admin_note TEXT
+      )
+    `);
+    
     saveDb();
     return true;
   } catch (err) {
@@ -271,6 +304,127 @@ app.get('/api/payments/:userId', (req, res) => {
     res.json({ success: true, payments });
   } catch (err) {
     console.error('Error getting payments:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
+// Get user orders
+app.get('/api/orders/:userId', (req, res) => {
+  const userId = parseInt(req.params.userId);
+  
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
+  }
+  
+  try {
+    const result = db.exec('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [userId]);
+    
+    const orders = [];
+    if (result.length && result[0].values.length) {
+      const columns = ['id', 'user_id', 'service_id', 'service_name', 'link', 'quantity', 'price', 'status', 'api_order_id', 'start_count', 'remains', 'created_at'];
+      result[0].values.forEach(row => {
+        const order = {};
+        row.forEach((val, idx) => {
+          order[columns[idx]] = val;
+        });
+        orders.push(order);
+      });
+    }
+    
+    res.json({ success: true, orders });
+  } catch (err) {
+    console.error('Error getting orders:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
+// Get premium status
+app.get('/api/premium/:userId', (req, res) => {
+  const userId = parseInt(req.params.userId);
+  
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
+  }
+  
+  try {
+    // Get active premium subscription
+    const now = new Date().toISOString();
+    const result = db.exec(
+      `SELECT * FROM premium_subscriptions 
+       WHERE user_id = ? AND status = 'active' AND expires_at > ? 
+       ORDER BY expires_at DESC LIMIT 1`, 
+      [userId, now]
+    );
+    
+    let premium = null;
+    if (result.length && result[0].values.length) {
+      const columns = ['id', 'user_id', 'months', 'price', 'status', 'activated_at', 'expires_at', 'created_at', 'admin_note'];
+      const row = result[0].values[0];
+      premium = {};
+      row.forEach((val, idx) => {
+        premium[columns[idx]] = val;
+      });
+    }
+    
+    if (premium) {
+      const expiresAt = new Date(premium.expires_at);
+      const daysLeft = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+      
+      res.json({
+        success: true,
+        is_premium: true,
+        days_left: daysLeft,
+        expires_at: premium.expires_at,
+        activated_at: premium.activated_at
+      });
+    } else {
+      res.json({
+        success: true,
+        is_premium: false,
+        days_left: 0
+      });
+    }
+  } catch (err) {
+    console.error('Error getting premium status:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
+// Get premium plans (static)
+app.get('/api/premium/plans', (req, res) => {
+  const plans = [
+    { months: 1, price: 45000, original_price: 55000, discount_percent: 18, popular: false, best_value: false },
+    { months: 3, price: 120000, original_price: 165000, discount_percent: 27, popular: true, best_value: false },
+    { months: 6, price: 210000, original_price: 330000, discount_percent: 36, popular: false, best_value: true },
+    { months: 12, price: 380000, original_price: 660000, discount_percent: 42, popular: false, best_value: false },
+  ];
+  res.json({ success: true, plans });
+});
+
+// Request premium (sends to admin)
+app.post('/api/premium/request', (req, res) => {
+  const { user_id, months, price } = req.body;
+  
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
+  }
+  
+  if (!user_id || !months || !price) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+  
+  try {
+    const now = new Date().toISOString();
+    db.run(`
+      INSERT INTO premium_subscriptions (user_id, months, price, status, created_at)
+      VALUES (?, ?, ?, 'pending', ?)
+    `, [user_id, months, price, now]);
+    
+    saveDb();
+    
+    res.json({ success: true, message: 'Premium request submitted' });
+  } catch (err) {
+    console.error('Error creating premium request:', err);
     res.status(500).json({ success: false, error: 'Database error' });
   }
 });

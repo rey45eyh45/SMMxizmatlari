@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, CheckCircle, XCircle, Loader, RefreshCw } from 'lucide-react'
 import { Card, EmptyState, Button, Loading } from '../components'
-import { ordersAPI } from '../lib/api'
-import { mockOrders } from '../lib/mockData'
+import { useAuth } from '../providers'
 import type { Order } from '../types'
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
@@ -17,18 +16,22 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; label: s
 }
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders)
+  const { user } = useAuth()
+  const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const fetchOrders = async () => {
+    if (!user?.user_id) return
+    
     try {
       setIsLoading(true)
-      const data = await ordersAPI.getMyOrders()
-      if (data.orders && data.orders.length > 0) {
+      const response = await fetch(`/api/orders/${user.user_id}`)
+      const data = await response.json()
+      if (data.success && data.orders) {
         setOrders(data.orders)
       }
     } catch (error) {
-      console.log('Using mock orders')
+      console.error('Error fetching orders:', error)
     } finally {
       setIsLoading(false)
     }
@@ -36,7 +39,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [user?.user_id])
 
   if (isLoading) {
     return <Loading />
