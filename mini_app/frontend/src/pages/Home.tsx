@@ -165,6 +165,7 @@ export default function Home() {
               transition={{ delay: 0.3 + index * 0.1 }}
             >
               <PlatformCard
+                id={platform.id}
                 emoji={platform.emoji}
                 name={platform.name}
                 color={platform.color}

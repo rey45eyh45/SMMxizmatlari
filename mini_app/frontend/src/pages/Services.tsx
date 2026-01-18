@@ -24,6 +24,7 @@ export default function Services() {
             transition={{ delay: index * 0.1 }}
           >
             <PlatformCard
+              id={platform.id}
               emoji={platform.emoji}
               name={platform.name}
               color={platform.color}
@@ -42,6 +43,7 @@ export default function Services() {
           transition={{ delay: 0.5 }}
         >
           <PlatformCard
+            id="sms"
             emoji="📱"
             name="Virtual Raqamlar"
             color="#4CAF50"

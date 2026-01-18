@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
 import { ChevronRight } from 'lucide-react'
+import { getPlatformIcon } from './icons/PlatformIcons'
 
 interface PlatformCardProps {
+  id?: string
   emoji: string
   name: string
   servicesCount?: number
@@ -10,12 +12,16 @@ interface PlatformCardProps {
 }
 
 export default function PlatformCard({
+  id,
   emoji,
   name,
   servicesCount,
   onClick,
   color
 }: PlatformCardProps) {
+  // Try to get SVG icon, fallback to emoji
+  const IconComponent = id ? getPlatformIcon(id) : null
+
   return (
     <motion.button
       whileTap={{ scale: 0.98 }}
@@ -31,10 +37,14 @@ export default function PlatformCard({
       />
       
       <div 
-        className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0"
-        style={{ backgroundColor: `${color}15` }}
+        className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: IconComponent ? 'transparent' : `${color}15` }}
       >
-        {emoji}
+        {IconComponent ? (
+          <IconComponent size={48} />
+        ) : (
+          <span className="text-3xl">{emoji}</span>
+        )}
       </div>
       
       <div className="flex-1 text-left">
