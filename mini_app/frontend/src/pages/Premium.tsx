@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Star, Sparkles } from 'lucide-react'
-import { Card, Loading } from '../components'
+import { Card } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
 
@@ -23,35 +23,39 @@ interface PremiumStatus {
 export default function Premium() {
   const { hapticFeedback, showAlert, tg } = useTelegram()
   const { user } = useAuth()
-  const [plans, setPlans] = useState<PremiumPlan[]>([])
+  const [plans, setPlans] = useState<PremiumPlan[]>([
+    { months: 1, price: 45000, original_price: 55000, discount_percent: 18, popular: false, best_value: false },
+    { months: 3, price: 120000, original_price: 165000, discount_percent: 27, popular: true, best_value: false },
+    { months: 6, price: 210000, original_price: 330000, discount_percent: 36, popular: false, best_value: true },
+    { months: 12, price: 380000, original_price: 660000, discount_percent: 42, popular: false, best_value: false },
+  ])
   const [status, setStatus] = useState<PremiumStatus>({ is_premium: false, days_left: 0 })
-  const [isLoading, setIsLoading] = useState(true)
   const [requesting, setRequesting] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true)
-        
         // Fetch plans
         const plansRes = await fetch('/api/premium/plans')
-        const plansData = await plansRes.json()
-        if (plansData.success) {
-          setPlans(plansData.plans)
+        if (plansRes.ok) {
+          const plansData = await plansRes.json()
+          if (plansData.success && plansData.plans) {
+            setPlans(plansData.plans)
+          }
         }
         
         // Fetch status
         if (user?.user_id) {
           const statusRes = await fetch(`/api/premium/${user.user_id}`)
-          const statusData = await statusRes.json()
-          if (statusData.success) {
-            setStatus(statusData)
+          if (statusRes.ok) {
+            const statusData = await statusRes.json()
+            if (statusData.success) {
+              setStatus(statusData)
+            }
           }
         }
       } catch (error) {
         console.error('Error fetching premium data:', error)
-      } finally {
-        setIsLoading(false)
       }
     }
     
@@ -99,10 +103,6 @@ export default function Premium() {
     } finally {
       setRequesting(false)
     }
-  }
-
-  if (isLoading) {
-    return <Loading />
   }
 
   return (
