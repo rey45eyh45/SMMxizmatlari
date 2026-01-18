@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, Copy, AlertCircle, Camera, Send } from 'lucide-react'
+import { Check, Copy, AlertCircle, Camera, Send, Upload, X, Image } from 'lucide-react'
 import { Card, Button, Input } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -20,6 +20,7 @@ export default function Deposit() {
   const navigate = useNavigate()
   const { hapticFeedback, showAlert, tg } = useTelegram()
   const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [amount, setAmount] = useState('')
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
@@ -27,6 +28,9 @@ export default function Deposit() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [methods, setMethods] = useState<PaymentMethod[]>([])
   const [paymentId, setPaymentId] = useState<number | null>(null)
+  const [receiptImage, setReceiptImage] = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     // Fetch payment methods
@@ -83,10 +87,68 @@ export default function Deposit() {
     }
   }
 
-  const sendReceiptToBot = () => {
-    // Botga o'tib chek yuborish
-    if (tg) {
-      tg.openTelegramLink(`https://t.me/SmmXizmatlari_bot?start=receipt_${paymentId}`)
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert?.('❌ Rasm hajmi 10MB dan katta')
+        return
+      }
+      
+      setReceiptImage(file)
+      setReceiptPreview(URL.createObjectURL(file))
+      hapticFeedback?.selection?.()
+    }
+  }
+
+  const clearImage = () => {
+    setReceiptImage(null)
+    setReceiptPreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const sendReceipt = async () => {
+    if (!receiptImage || !paymentId || !user?.user_id) return
+    
+    setUploadStatus('uploading')
+    setIsSubmitting(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('receipt', receiptImage)
+      formData.append('payment_id', paymentId.toString())
+      formData.append('user_id', user.user_id.toString())
+      formData.append('amount', parsedAmount.toString())
+      formData.append('full_name', user.full_name || 'Foydalanuvchi')
+      
+      const response = await fetch('/api/payment/upload-receipt', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setUploadStatus('success')
+        hapticFeedback?.notification?.('success')
+        
+        // 2 sekunddan keyin Balance sahifasiga o'tish
+        setTimeout(() => {
+          navigate('/balance')
+        }, 2000)
+      } else {
+        setUploadStatus('error')
+        showAlert?.('❌ ' + (data.error || 'Xatolik yuz berdi'))
+      }
+    } catch (error) {
+      console.error('Error uploading receipt:', error)
+      setUploadStatus('error')
+      showAlert?.('❌ Chekni yuborishda xatolik')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -283,49 +345,106 @@ export default function Deposit() {
           animate={{ opacity: 1, x: 0 }}
           className="space-y-4"
         >
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center py-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-4">
-              <Camera size={32} />
-            </div>
-            <p className="text-xl font-bold">Chek yuborish</p>
-            <p className="text-white/80 mt-2">To'lov #{paymentId}</p>
-          </Card>
+          {/* Success Message */}
+          {uploadStatus === 'success' ? (
+            <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-center py-8">
+              <div className="w-20 h-20 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-4">
+                <Check size={40} />
+              </div>
+              <p className="text-2xl font-bold">Chek yuborildi!</p>
+              <p className="text-white/80 mt-2">Admin tez orada tekshiradi</p>
+              <p className="text-white/60 text-sm mt-4">Balans sahifasiga o'tmoqda...</p>
+            </Card>
+          ) : (
+            <>
+              <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center py-6">
+                <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-4">
+                  <Camera size={32} />
+                </div>
+                <p className="text-xl font-bold">Chek yuborish</p>
+                <p className="text-white/80 mt-2">To'lov #{paymentId}</p>
+                <p className="text-white/60 text-sm mt-1">{parsedAmount.toLocaleString()} so'm</p>
+              </Card>
 
-          <Card>
-            <div className="text-center space-y-3">
-              <p className="text-tg-text font-medium">
-                To'lov chekini (skrinshot) botga yuboring
-              </p>
-              <p className="text-tg-hint text-sm">
-                Admin chekni tekshirib, balansingizga {parsedAmount.toLocaleString()} so'm qo'shadi
-              </p>
-            </div>
-          </Card>
+              {/* Image Upload Area */}
+              <Card>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageSelect}
+                  accept="image/*"
+                  className="hidden"
+                />
+                
+                {receiptPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={receiptPreview} 
+                      alt="Receipt" 
+                      className="w-full rounded-lg max-h-64 object-contain bg-gray-100"
+                    />
+                    <button
+                      onClick={clearImage}
+                      className="absolute top-2 right-2 p-2 rounded-full bg-red-500 text-white shadow-lg"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-12 border-2 border-dashed border-tg-hint/30 rounded-xl flex flex-col items-center justify-center gap-3 transition-colors hover:border-tg-button hover:bg-tg-button/5"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-tg-button/10 flex items-center justify-center">
+                      <Image size={32} className="text-tg-button" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-tg-text font-medium">Chek rasmini tanlang</p>
+                      <p className="text-tg-hint text-sm mt-1">Bosing yoki faylni torting</p>
+                    </div>
+                  </button>
+                )}
+              </Card>
 
-          <div className="flex items-start gap-3 text-tg-hint text-sm bg-blue-50 p-4 rounded-xl">
-            <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-            <div className="text-blue-800">
-              <p className="font-medium mb-1">Muhim!</p>
-              <p>Chekda to'lov miqdori va sana ko'rinishi kerak. Admin 5-30 daqiqa ichida tasdiqlaydi.</p>
-            </div>
-          </div>
+              <div className="flex items-start gap-3 text-tg-hint text-sm bg-blue-50 p-4 rounded-xl">
+                <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-blue-800">
+                  <p className="font-medium mb-1">Muhim!</p>
+                  <p>Chekda to'lov miqdori va sana ko'rinishi kerak. Admin 5-30 daqiqa ichida tekshiradi.</p>
+                </div>
+              </div>
 
-          <Button
-            fullWidth
-            size="lg"
-            onClick={sendReceiptToBot}
-            icon={<Send size={20} />}
-          >
-            Botga o'tib chek yuborish
-          </Button>
+              <Button
+                fullWidth
+                size="lg"
+                onClick={sendReceipt}
+                disabled={!receiptImage}
+                loading={isSubmitting}
+                icon={<Send size={20} />}
+              >
+                {isSubmitting ? 'Yuborilmoqda...' : 'Chekni yuborish'}
+              </Button>
 
-          <Button
-            fullWidth
-            variant="ghost"
-            onClick={() => navigate('/balance')}
-          >
-            Keyinroq yuboraman
-          </Button>
+              {!receiptImage && (
+                <Button
+                  fullWidth
+                  variant="secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  icon={<Upload size={20} />}
+                >
+                  Rasm tanlash
+                </Button>
+              )}
+
+              <Button
+                fullWidth
+                variant="ghost"
+                onClick={() => navigate('/balance')}
+              >
+                Keyinroq yuboraman
+              </Button>
+            </>
+          )}
         </motion.div>
       )}
     </div>

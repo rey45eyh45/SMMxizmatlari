@@ -3,12 +3,17 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import initSqlJs from 'sql.js';
 import fs from 'fs';
+import fetch, { FormData, Blob } from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Bot config for sending receipts
+const BOT_TOKEN = process.env.BOT_TOKEN || '';
+const ADMIN_ID = process.env.ADMIN_ID || '';
 
 // JSON parsing
 app.use(express.json());
@@ -474,6 +479,76 @@ app.post('/api/payment/create', (req, res) => {
   } catch (err) {
     console.error('Error creating payment:', err);
     res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
+// Upload receipt image and send to admin via Telegram Bot
+import multer from 'multer';
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+});
+
+app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, res) => {
+  try {
+    const { payment_id, user_id, amount, full_name } = req.body;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    if (!BOT_TOKEN || !ADMIN_ID) {
+      console.error('BOT_TOKEN or ADMIN_ID not configured');
+      return res.status(500).json({ success: false, error: 'Bot configuration missing' });
+    }
+    
+    // Send photo to admin via Telegram Bot API
+    const caption = `📸 <b>Mini App To'lov Cheki!</b>\n\n` +
+      `👤 Foydalanuvchi: ${full_name || 'Noma\'lum'}\n` +
+      `🆔 ID: ${user_id}\n` +
+      `📝 To'lov ID: #${payment_id}\n` +
+      `💰 Summa: ${parseInt(amount).toLocaleString()} so'm\n` +
+      `📍 Usul: Karta orqali\n\n` +
+      `⏳ Tekshirishni kutmoqda...`;
+    
+    const formData = new FormData();
+    formData.append('chat_id', ADMIN_ID);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+    formData.append('photo', new Blob([file.buffer], { type: file.mimetype }), file.originalname || 'receipt.jpg');
+    
+    // Add inline keyboard for admin
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '✅ Tasdiqlash', callback_data: `miniapp_approve_${user_id}_${payment_id}` }],
+        [{ text: '❌ Rad etish', callback_data: `miniapp_reject_${user_id}_${payment_id}` }]
+      ]
+    };
+    formData.append('reply_markup', JSON.stringify(keyboard));
+    
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      // Update payment status
+      if (db) {
+        db.run('UPDATE payments SET status = ? WHERE id = ?', ['receipt_sent', payment_id]);
+        saveDb();
+      }
+      
+      res.json({ success: true, message: 'Receipt sent to admin' });
+    } else {
+      console.error('Telegram API error:', result);
+      res.status(500).json({ success: false, error: 'Failed to send receipt' });
+    }
+  } catch (err) {
+    console.error('Error uploading receipt:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
