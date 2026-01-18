@@ -1,8 +1,8 @@
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import sqlite3 from 'better-sqlite3';
+import initSqlJs from 'sql.js';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,14 +13,27 @@ const PORT = process.env.PORT || 3000;
 // JSON parsing
 app.use(express.json());
 
-// Database - SQLite (shared with bot via volume or separate)
+// Database - SQLite with sql.js
 const DATABASE_PATH = process.env.DATABASE_PATH || './smm_bot.db';
+let db = null;
 
 // Initialize database
-function initDb() {
+async function initDb() {
   try {
-    const db = sqlite3(DATABASE_PATH);
-    db.exec(`
+    const SQL = await initSqlJs();
+    
+    // Try to load existing database
+    if (fs.existsSync(DATABASE_PATH)) {
+      const fileBuffer = fs.readFileSync(DATABASE_PATH);
+      db = new SQL.Database(fileBuffer);
+      console.log('Loaded existing database');
+    } else {
+      db = new SQL.Database();
+      console.log('Created new database');
+    }
+    
+    // Create table if not exists
+    db.run(`
       CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
@@ -34,14 +47,38 @@ function initDb() {
         phone TEXT
       )
     `);
-    return db;
+    
+    saveDb();
+    return true;
   } catch (err) {
     console.error('Database error:', err);
-    return null;
+    return false;
   }
 }
 
-const db = initDb();
+// Save database to file
+function saveDb() {
+  if (db) {
+    try {
+      const data = db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(DATABASE_PATH, buffer);
+    } catch (err) {
+      console.error('Error saving database:', err);
+    }
+  }
+}
+
+// Helper to get user from query result
+function rowToUser(row) {
+  if (!row || row.length === 0) return null;
+  const columns = ['user_id', 'username', 'full_name', 'balance', 'referral_id', 'referral_count', 'referral_earnings', 'is_banned', 'created_at', 'phone'];
+  const user = {};
+  row.forEach((val, idx) => {
+    user[columns[idx]] = val;
+  });
+  return user;
+}
 
 // API Routes
 app.get('/api/health', (req, res) => {
@@ -57,11 +94,13 @@ app.get('/api/user/:userId', (req, res) => {
   }
   
   try {
-    const user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(userId);
+    const result = db.exec('SELECT * FROM users WHERE user_id = ?', [userId]);
     
-    if (!user) {
+    if (!result.length || !result[0].values.length) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
+    
+    const user = rowToUser(result[0].values[0]);
     
     res.json({
       success: true,
@@ -96,17 +135,21 @@ app.post('/api/user/create', (req, res) => {
   
   try {
     // Check if user exists
-    let user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(user_id);
+    let result = db.exec('SELECT * FROM users WHERE user_id = ?', [user_id]);
+    let user = result.length && result[0].values.length ? rowToUser(result[0].values[0]) : null;
     
     if (!user) {
       // Create new user
       const now = new Date().toISOString();
-      db.prepare(`
+      db.run(`
         INSERT INTO users (user_id, username, full_name, balance, created_at)
         VALUES (?, ?, ?, 0, ?)
-      `).run(user_id, username || '', full_name || '', now);
+      `, [user_id, username || '', full_name || '', now]);
       
-      user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(user_id);
+      saveDb();
+      
+      result = db.exec('SELECT * FROM users WHERE user_id = ?', [user_id]);
+      user = result.length && result[0].values.length ? rowToUser(result[0].values[0]) : null;
     }
     
     res.json({
@@ -153,17 +196,21 @@ app.post('/api/auth', (req, res) => {
     }
     
     // Get or create user
-    let user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(tgUser.id);
+    let result = db.exec('SELECT * FROM users WHERE user_id = ?', [tgUser.id]);
+    let user = result.length && result[0].values.length ? rowToUser(result[0].values[0]) : null;
     
     if (!user) {
       const now = new Date().toISOString();
       const fullName = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
-      db.prepare(`
+      db.run(`
         INSERT INTO users (user_id, username, full_name, balance, created_at)
         VALUES (?, ?, ?, 0, ?)
-      `).run(tgUser.id, tgUser.username || '', fullName, now);
+      `, [tgUser.id, tgUser.username || '', fullName, now]);
       
-      user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(tgUser.id);
+      saveDb();
+      
+      result = db.exec('SELECT * FROM users WHERE user_id = ?', [tgUser.id]);
+      user = result.length && result[0].values.length ? rowToUser(result[0].values[0]) : null;
     }
     
     res.json({
@@ -193,6 +240,9 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Initialize database and start server
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 });
