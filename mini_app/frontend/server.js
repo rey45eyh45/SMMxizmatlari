@@ -499,7 +499,18 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
 });
 
-app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, res) => {
+// Error handler for multer
+const uploadMiddleware = (req, res, next) => {
+  upload.single('receipt')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ success: false, error: 'File upload error: ' + err.message });
+    }
+    next();
+  });
+};
+
+app.post('/api/payment/upload-receipt', uploadMiddleware, async (req, res) => {
   console.log('Upload receipt endpoint called');
   
   try {
@@ -580,9 +591,15 @@ app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, re
       res.status(500).json({ success: false, error: response.data.description || 'Failed to send receipt' });
     }
   } catch (err) {
-    console.error('Error uploading receipt:', err.response?.data || err.message);
-    res.status(500).json({ success: false, error: 'Server error: ' + (err.response?.data?.description || err.message) });
+    console.error('Error uploading receipt:', err.response?.data || err.message || err);
+    res.status(500).json({ success: false, error: 'Server error: ' + (err.response?.data?.description || err.message || 'Unknown error') });
   }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Global error:', err);
+  res.status(500).json({ success: false, error: 'Server error: ' + (err.message || 'Unknown error') });
 });
 
 // Serve static files
@@ -597,5 +614,7 @@ app.get('*', (req, res) => {
 initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log('BOT_TOKEN:', BOT_TOKEN ? 'Set (' + BOT_TOKEN.substring(0, 10) + '...)' : 'NOT SET');
+    console.log('ADMIN_ID:', ADMIN_ID || 'NOT SET');
   });
 });

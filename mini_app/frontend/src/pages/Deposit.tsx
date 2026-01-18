@@ -148,7 +148,18 @@ export default function Deposit() {
       
       console.log('Response status:', response.status)
       
-      const data = await response.json()
+      // Check if response is ok
+      const text = await response.text()
+      console.log('Response text:', text)
+      
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        console.error('Failed to parse JSON:', text)
+        throw new Error('Server error: ' + (text || 'No response'))
+      }
+      
       console.log('Response data:', data)
       
       if (data.success) {
