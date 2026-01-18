@@ -338,6 +338,17 @@ app.get('/api/orders/:userId', (req, res) => {
   }
 });
 
+// Get premium plans (static) - MUST BE BEFORE :userId route
+app.get('/api/premium/plans', (req, res) => {
+  const plans = [
+    { months: 1, price: 45000, original_price: 55000, discount_percent: 18, popular: false, best_value: false },
+    { months: 3, price: 120000, original_price: 165000, discount_percent: 27, popular: true, best_value: false },
+    { months: 6, price: 210000, original_price: 330000, discount_percent: 36, popular: false, best_value: true },
+    { months: 12, price: 380000, original_price: 660000, discount_percent: 42, popular: false, best_value: false },
+  ];
+  res.json({ success: true, plans });
+});
+
 // Get premium status
 app.get('/api/premium/:userId', (req, res) => {
   const userId = parseInt(req.params.userId);
@@ -388,17 +399,6 @@ app.get('/api/premium/:userId', (req, res) => {
     console.error('Error getting premium status:', err);
     res.status(500).json({ success: false, error: 'Database error' });
   }
-});
-
-// Get premium plans (static)
-app.get('/api/premium/plans', (req, res) => {
-  const plans = [
-    { months: 1, price: 45000, original_price: 55000, discount_percent: 18, popular: false, best_value: false },
-    { months: 3, price: 120000, original_price: 165000, discount_percent: 27, popular: true, best_value: false },
-    { months: 6, price: 210000, original_price: 330000, discount_percent: 36, popular: false, best_value: true },
-    { months: 12, price: 380000, original_price: 660000, discount_percent: 42, popular: false, best_value: false },
-  ];
-  res.json({ success: true, plans });
 });
 
 // Request premium (sends to admin)
