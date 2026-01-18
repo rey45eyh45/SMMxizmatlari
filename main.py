@@ -1053,14 +1053,8 @@ async def cmd_start(message: Message, state: FSMContext):
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
-    # Inline tugma - Mini App uchun (cache muammosidan qochish)
-    from keyboards_v3 import MINI_APP_URL
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📱 Mini App ochish", web_app=WebAppInfo(url=f"{MINI_APP_URL}?user_id={user_id}"))]
-    ])
-    
     await message.answer(welcome_text, reply_markup=main_menu(user_id))
-    await message.answer("🚀 <b>Mini App</b> - qulay interfeys:", reply_markup=inline_kb)
+    await message.answer("🚀 <b>Mini App</b> - qulay interfeys:", reply_markup=mini_app_inline_button(user_id))
 
 
 # Telefon raqam qabul qilish
@@ -1115,6 +1109,7 @@ async def process_phone_contact(message: Message, state: FSMContext):
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
     await message.answer(welcome_text, reply_markup=main_menu(message.from_user.id))
+    await message.answer("🚀 <b>Mini App</b> - qulay interfeys:", reply_markup=mini_app_inline_button(message.from_user.id))
 
 
 # O'tkazib yuborish
@@ -1139,10 +1134,10 @@ async def skip_phone(message: Message, state: FSMContext):
     welcome_text += "├ 🎵 TikTok follower, like, view\n"
     welcome_text += "└ 📱 Virtual telefon raqamlar (SMS)\n\n"
     welcome_text += f"💰 <b>Balansingiz:</b> {balance:,.0f} so'm\n\n"
-    welcome_text += "⚠️ <i>Mini App dan foydalanish uchun /start bosib telefon raqamingizni yuboring.</i>\n\n"
     welcome_text += "👇 Quyidagi tugmalardan birini tanlang:"
     
     await message.answer(welcome_text, reply_markup=main_menu(message.from_user.id))
+    await message.answer("🚀 <b>Mini App</b> - qulay interfeys:", reply_markup=mini_app_inline_button(message.from_user.id))
 
 
 @router.message(Command("help"))

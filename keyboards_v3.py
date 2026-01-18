@@ -31,15 +31,21 @@ def main_menu(user_id: int = None):
         KeyboardButton(text="💰 Mening hisobim"),
         KeyboardButton(text="💵 Hisob to'ldirish")
     )
-    # Mini App tugmasi - user_id bilan
+    return builder.as_markup(resize_keyboard=True)
+
+
+def mini_app_inline_button(user_id: int = None):
+    """Mini App inline tugmasi - profil rasmi bilan ochiladi"""
     mini_app_url = MINI_APP_URL
     if user_id:
         mini_app_url = f"{MINI_APP_URL}?user_id={user_id}"
-    builder.row(KeyboardButton(
-        text="📱 Mini App ochish", 
+    
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="📱 Mini App ochish",
         web_app=WebAppInfo(url=mini_app_url)
     ))
-    return builder.as_markup(resize_keyboard=True)
+    return builder.as_markup()
 
 
 def social_networks_menu():
