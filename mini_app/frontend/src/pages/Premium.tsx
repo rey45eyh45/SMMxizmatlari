@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Crown, Star, Sparkles } from 'lucide-react'
+import { Star, Sparkles } from 'lucide-react'
 import { Card } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -107,18 +107,28 @@ export default function Premium() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center py-4">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center mb-4"
+      {/* Video Animation */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative rounded-2xl overflow-hidden"
+      >
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-48 object-cover"
         >
-          <Crown size={40} className="text-white" />
-        </motion.div>
-        <h1 className="text-2xl font-bold text-tg-text">Telegram Premium</h1>
-        <p className="text-tg-hint mt-1">Arzon narxlarda obuna bo'ling!</p>
-      </div>
+          <source src="/premium-animation.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Telegram Premium</h1>
+            <p className="text-white/80">Arzon narxlarda obuna bo'ling!</p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Current Status */}
       {status.is_premium && (
@@ -238,9 +248,15 @@ export default function Premium() {
       </Card>
 
       {/* Note */}
-      <p className="text-center text-tg-hint text-sm">
-        ⏱ Obuna 24 soat ichida admin tomonidan faollashtiriladi
-      </p>
+      <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl">⚡</div>
+          <div>
+            <p className="font-semibold">Tez yetkazib berish!</p>
+            <p className="text-white/80 text-sm">30 daqiqa ichida faollashtiriladi</p>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }
