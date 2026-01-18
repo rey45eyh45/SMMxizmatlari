@@ -141,19 +141,28 @@ app.get('/api/health', (req, res) => {
 app.get('/api/user/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
   
+  console.log('Getting user:', userId, 'from BOT_API_URL:', BOT_API_URL);
+  
   try {
     // Try to get from Bot API first (main database)
-    const botResponse = await axios.get(`${BOT_API_URL}/api/user/${userId}`, {
+    const url = `${BOT_API_URL}/api/user/${userId}`;
+    console.log('Fetching from:', url);
+    
+    const botResponse = await axios.get(url, {
       timeout: 5000
     });
+    
+    console.log('Bot API response:', botResponse.status, botResponse.data);
     
     if (botResponse.data.success) {
       console.log('Got user from Bot API:', botResponse.data.user);
       return res.json(botResponse.data);
     }
   } catch (err) {
-    console.log('Bot API error, falling back to local DB:', err.message);
+    console.log('Bot API error:', err.response?.status, err.response?.data || err.message);
   }
+  
+  console.log('Falling back to local database');
   
   // Fallback to local database
   if (!db) {
