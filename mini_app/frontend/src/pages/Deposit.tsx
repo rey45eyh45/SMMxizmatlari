@@ -111,7 +111,22 @@ export default function Deposit() {
   }
 
   const sendReceipt = async () => {
-    if (!receiptImage || !paymentId || !user?.user_id) return
+    console.log('sendReceipt called', { receiptImage, paymentId, user_id: user?.user_id })
+    
+    if (!receiptImage) {
+      showAlert?.('❌ Iltimos, chek rasmini tanlang')
+      return
+    }
+    
+    if (!paymentId) {
+      showAlert?.('❌ To\'lov ID topilmadi')
+      return
+    }
+    
+    if (!user?.user_id) {
+      showAlert?.('❌ Foydalanuvchi aniqlanmadi')
+      return
+    }
     
     setUploadStatus('uploading')
     setIsSubmitting(true)
@@ -124,12 +139,17 @@ export default function Deposit() {
       formData.append('amount', parsedAmount.toString())
       formData.append('full_name', user.full_name || 'Foydalanuvchi')
       
+      console.log('Sending receipt...', { paymentId, amount: parsedAmount })
+      
       const response = await fetch('/api/payment/upload-receipt', {
         method: 'POST',
         body: formData
       })
       
+      console.log('Response status:', response.status)
+      
       const data = await response.json()
+      console.log('Response data:', data)
       
       if (data.success) {
         setUploadStatus('success')
@@ -146,7 +166,7 @@ export default function Deposit() {
     } catch (error) {
       console.error('Error uploading receipt:', error)
       setUploadStatus('error')
-      showAlert?.('❌ Chekni yuborishda xatolik')
+      showAlert?.('❌ Chekni yuborishda xatolik: ' + (error as Error).message)
     } finally {
       setIsSubmitting(false)
     }

@@ -3,7 +3,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import initSqlJs from 'sql.js';
 import fs from 'fs';
-import fetch, { FormData, Blob } from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -484,23 +483,35 @@ app.post('/api/payment/create', (req, res) => {
 
 // Upload receipt image and send to admin via Telegram Bot
 import multer from 'multer';
+import FormData from 'form-data';
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
 });
 
 app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, res) => {
+  console.log('Upload receipt endpoint called');
+  
   try {
     const { payment_id, user_id, amount, full_name } = req.body;
     const file = req.file;
+    
+    console.log('Request body:', { payment_id, user_id, amount, full_name });
+    console.log('File:', file ? { name: file.originalname, size: file.size } : 'No file');
     
     if (!file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
     
-    if (!BOT_TOKEN || !ADMIN_ID) {
-      console.error('BOT_TOKEN or ADMIN_ID not configured');
-      return res.status(500).json({ success: false, error: 'Bot configuration missing' });
+    if (!BOT_TOKEN) {
+      console.error('BOT_TOKEN not configured');
+      return res.status(500).json({ success: false, error: 'Bot token missing' });
+    }
+    
+    if (!ADMIN_ID) {
+      console.error('ADMIN_ID not configured');
+      return res.status(500).json({ success: false, error: 'Admin ID missing' });
     }
     
     // Send photo to admin via Telegram Bot API
@@ -508,31 +519,39 @@ app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, re
       `👤 Foydalanuvchi: ${full_name || 'Noma\'lum'}\n` +
       `🆔 ID: ${user_id}\n` +
       `📝 To'lov ID: #${payment_id}\n` +
-      `💰 Summa: ${parseInt(amount).toLocaleString()} so'm\n` +
+      `💰 Summa: ${parseInt(amount || 0).toLocaleString()} so'm\n` +
       `📍 Usul: Karta orqali\n\n` +
       `⏳ Tekshirishni kutmoqda...`;
     
-    const formData = new FormData();
-    formData.append('chat_id', ADMIN_ID);
-    formData.append('caption', caption);
-    formData.append('parse_mode', 'HTML');
-    formData.append('photo', new Blob([file.buffer], { type: file.mimetype }), file.originalname || 'receipt.jpg');
-    
     // Add inline keyboard for admin
-    const keyboard = {
+    const keyboard = JSON.stringify({
       inline_keyboard: [
         [{ text: '✅ Tasdiqlash', callback_data: `miniapp_approve_${user_id}_${payment_id}` }],
         [{ text: '❌ Rad etish', callback_data: `miniapp_reject_${user_id}_${payment_id}` }]
       ]
-    };
-    formData.append('reply_markup', JSON.stringify(keyboard));
+    });
+    
+    // Use form-data package for multipart upload
+    const formData = new FormData();
+    formData.append('chat_id', ADMIN_ID);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+    formData.append('reply_markup', keyboard);
+    formData.append('photo', file.buffer, {
+      filename: file.originalname || 'receipt.jpg',
+      contentType: file.mimetype
+    });
+    
+    console.log('Sending to Telegram...');
     
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: formData.getHeaders()
     });
     
     const result = await response.json();
+    console.log('Telegram response:', result);
     
     if (result.ok) {
       // Update payment status
@@ -544,11 +563,11 @@ app.post('/api/payment/upload-receipt', upload.single('receipt'), async (req, re
       res.json({ success: true, message: 'Receipt sent to admin' });
     } else {
       console.error('Telegram API error:', result);
-      res.status(500).json({ success: false, error: 'Failed to send receipt' });
+      res.status(500).json({ success: false, error: result.description || 'Failed to send receipt' });
     }
   } catch (err) {
     console.error('Error uploading receipt:', err);
-    res.status(500).json({ success: false, error: 'Server error' });
+    res.status(500).json({ success: false, error: 'Server error: ' + err.message });
   }
 });
 
