@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, Copy, AlertCircle } from 'lucide-react'
+import { Check, Copy, AlertCircle, Camera, Send } from 'lucide-react'
 import { Card, Button, Input } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -18,14 +18,15 @@ interface PaymentMethod {
 
 export default function Deposit() {
   const navigate = useNavigate()
-  const { hapticFeedback, showAlert } = useTelegram()
+  const { hapticFeedback, showAlert, tg } = useTelegram()
   const { user } = useAuth()
   
   const [amount, setAmount] = useState('')
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
-  const [step, setStep] = useState<'amount' | 'method' | 'confirm'>('amount')
+  const [step, setStep] = useState<'amount' | 'method' | 'confirm' | 'receipt'>('amount')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [methods, setMethods] = useState<PaymentMethod[]>([])
+  const [paymentId, setPaymentId] = useState<number | null>(null)
 
   useEffect(() => {
     // Fetch payment methods
@@ -68,9 +69,9 @@ export default function Deposit() {
       const data = await response.json()
       
       if (data.success) {
+        setPaymentId(data.payment_id)
         hapticFeedback?.notification?.('success')
-        showAlert?.(`✅ To'lov so'rovi #${data.payment_id} yaratildi!\n\nAdmin 5-30 daqiqa ichida tekshirib tasdiqlaydi.`)
-        navigate('/balance')
+        setStep('receipt')
       } else {
         showAlert?.('❌ Xatolik: ' + (data.error || 'Noma\'lum xatolik'))
       }
@@ -78,6 +79,16 @@ export default function Deposit() {
       console.error('Error creating payment:', error)
       showAlert?.('❌ Xatolik yuz berdi')
     } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const sendReceiptToBot = () => {
+    // Botga o'tib chek yuborish
+    if (tg) {
+      tg.openTelegramLink(`https://t.me/SmmXizmatlari_bot?start=receipt_${paymentId}`)
+    }
+  }
       setIsSubmitting(false)
     }
   }
@@ -262,9 +273,62 @@ export default function Deposit() {
               icon={<Check size={20} />}
               className="flex-1"
             >
-              Tasdiqlash
+              To'ladim
             </Button>
           </div>
+        </motion.div>
+      )}
+
+      {/* Step 4: Send Receipt */}
+      {step === 'receipt' && (
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="space-y-4"
+        >
+          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center py-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-4">
+              <Camera size={32} />
+            </div>
+            <p className="text-xl font-bold">Chek yuborish</p>
+            <p className="text-white/80 mt-2">To'lov #{paymentId}</p>
+          </Card>
+
+          <Card>
+            <div className="text-center space-y-3">
+              <p className="text-tg-text font-medium">
+                To'lov chekini (skrinshot) botga yuboring
+              </p>
+              <p className="text-tg-hint text-sm">
+                Admin chekni tekshirib, balansingizga {parsedAmount.toLocaleString()} so'm qo'shadi
+              </p>
+            </div>
+          </Card>
+
+          <div className="flex items-start gap-3 text-tg-hint text-sm bg-blue-50 p-4 rounded-xl">
+            <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-blue-800">
+              <p className="font-medium mb-1">Muhim!</p>
+              <p>Chekda to'lov miqdori va sana ko'rinishi kerak. Admin 5-30 daqiqa ichida tasdiqlaydi.</p>
+            </div>
+          </div>
+
+          <Button
+            fullWidth
+            size="lg"
+            onClick={sendReceiptToBot}
+            icon={<Send size={20} />}
+          >
+            Botga o'tib chek yuborish
+          </Button>
+
+          <Button
+            fullWidth
+            variant="ghost"
+            onClick={() => navigate('/balance')}
+          >
+            Keyinroq yuboraman
+          </Button>
         </motion.div>
       )}
     </div>

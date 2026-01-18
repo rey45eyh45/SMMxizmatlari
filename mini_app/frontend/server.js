@@ -432,9 +432,7 @@ app.post('/api/premium/request', (req, res) => {
 // Get payment methods
 app.get('/api/payment/methods', (req, res) => {
   const methods = [
-    { id: 'click', name: 'Click', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
-    { id: 'payme', name: 'Payme', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
-    { id: 'uzum', name: 'Uzum', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
+    { id: 'card', name: 'Karta orqali', card_number: '9860 1901 0198 2212', card_holder: 'IDEAL SMM', min_amount: 5000 },
   ];
   res.json({ success: true, methods });
 });
