@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Wallet, 
@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Sparkles,
   User,
-  Shield
+  Shield,
+  RefreshCw
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -23,16 +24,30 @@ export default function Home() {
   const navigate = useNavigate()
   const { hapticFeedback, user: tgUser } = useTelegram()
   const { user, isLoading, error, refetchUser } = useAuth()
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Admin tekshirish
   const isAdmin = user?.user_id ? ADMIN_IDS.includes(user.user_id) : false
 
+  // Balansni yangilash funksiyasi
+  const handleRefreshBalance = useCallback(async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      await refetchUser()
+      hapticFeedback?.notification?.('success')
+    } catch (err) {
+      console.error('Refresh error:', err)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [refetchUser, hapticFeedback, isRefreshing])
+
   // Sahifa ochilganda balans olish
   useEffect(() => {
-    if (user?.user_id) {
-      refetchUser()
-    }
-  }, [user?.user_id])
+    // Sahifa ochilganda har doim balansni yangilash
+    refetchUser()
+  }, [])
 
   if (isLoading) {
     return <Loading />
@@ -106,9 +121,21 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/80 text-sm">Balansingiz</p>
-              <p className="text-3xl font-bold mt-1">
-                {(user?.balance || 0).toLocaleString()} <span className="text-lg">so'm</span>
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-3xl font-bold">
+                  {(user?.balance || 0).toLocaleString()} <span className="text-lg">so'm</span>
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRefreshBalance()
+                  }}
+                  className={`w-8 h-8 bg-white/20 rounded-full flex items-center justify-center transition-transform ${isRefreshing ? 'animate-spin' : 'hover:bg-white/30'}`}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
             </div>
             <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
               <Wallet size={28} />

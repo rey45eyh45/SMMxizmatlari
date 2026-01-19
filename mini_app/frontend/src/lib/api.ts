@@ -66,7 +66,16 @@ export const userAPI = {
   },
   
   getById: async (userId: number): Promise<{ success: boolean; user: User }> => {
-    const { data } = await api.get(`/api/user/${userId}`)
+    // Cache-control header qo'shib so'rov yuborish
+    const { data } = await api.get(`/api/user/${userId}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      },
+      params: {
+        _t: Date.now() // Cache busting
+      }
+    })
     return data
   },
   
@@ -81,7 +90,16 @@ export const userAPI = {
   },
   
   getBalance: async (): Promise<{ balance: number }> => {
-    const { data } = await api.get('/api/user/balance')
+    // Cache-control header qo'shib balans olish
+    const { data } = await api.get('/api/user/balance', {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      },
+      params: {
+        _t: Date.now() // Cache busting
+      }
+    })
     return data
   },
   

@@ -2,15 +2,13 @@
 """
 Foydalanuvchi endpointlari
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Response
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
-import httpx
 
 from ..auth import get_current_user, get_current_user_optional
 from ..database import Database
 from ..models import UserResponse, BalanceResponse, ReferralStatsResponse
-from ..config import BOT_TOKEN, BOT_API_URL
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -39,10 +37,18 @@ async def get_current_user_info(user: Dict[str, Any] = Depends(get_current_user)
 
 
 @router.get("/balance", response_model=BalanceResponse)
-async def get_balance(user: Dict[str, Any] = Depends(get_current_user)):
+async def get_balance(
+    response: Response,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Foydalanuvchi balansini olish
     """
+    # Cache header qo'shish - doimo fresh data olish
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     balance = Database.get_balance(user["user_id"])
     return BalanceResponse(
         balance=balance,
@@ -51,61 +57,34 @@ async def get_balance(user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @router.get("/{user_id}")
-async def get_user_by_id(user_id: int) -> Dict[str, Any]:
+async def get_user_by_id(user_id: int, response: Response) -> Dict[str, Any]:
     """
     User ID bo'yicha foydalanuvchi ma'lumotlarini olish
-    Bot API orqali - shared database issue oldini olish
+    To'g'ridan-to'g'ri shared database dan olish
     """
-    try:
-        # Bot API dan ma'lumot olish
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{BOT_API_URL}/api/user/{user_id}")
-            
-            if response.status_code == 404:
-                raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-            
-            if response.status_code != 200:
-                # Fallback - local database
-                user = Database.get_user(user_id)
-                if not user:
-                    raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-                
-                return {
-                    "success": True,
-                    "user": {
-                        "user_id": user["user_id"],
-                        "username": user.get("username"),
-                        "full_name": user.get("full_name"),
-                        "balance": user.get("balance", 0),
-                        "referral_count": user.get("referral_count", 0),
-                        "referral_earnings": user.get("referral_earnings", 0),
-                        "is_banned": bool(user.get("is_banned", 0)),
-                        "created_at": user.get("created_at")
-                    }
-                }
-            
-            # Bot API dan kelgan ma'lumotni qaytarish
-            return response.json()
-            
-    except httpx.RequestError:
-        # Bot API ga ulanib bo'lmasa - fallback local DB
-        user = Database.get_user(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-        
-        return {
-            "success": True,
-            "user": {
-                "user_id": user["user_id"],
-                "username": user.get("username"),
-                "full_name": user.get("full_name"),
-                "balance": user.get("balance", 0),
-                "referral_count": user.get("referral_count", 0),
-                "referral_earnings": user.get("referral_earnings", 0),
-                "is_banned": bool(user.get("is_banned", 0)),
-                "created_at": user.get("created_at")
-            }
+    # Cache header qo'shish - doimo fresh data olish
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    # To'g'ridan-to'g'ri local database dan olish (shared smm_bot.db)
+    user = Database.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    return {
+        "success": True,
+        "user": {
+            "user_id": user["user_id"],
+            "username": user.get("username"),
+            "full_name": user.get("full_name"),
+            "balance": user.get("balance", 0),
+            "referral_count": user.get("referral_count", 0),
+            "referral_earnings": user.get("referral_earnings", 0),
+            "is_banned": bool(user.get("is_banned", 0)),
+            "created_at": user.get("created_at")
         }
+    }
 
 
 @router.post("/create")
