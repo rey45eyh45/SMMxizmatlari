@@ -25,6 +25,7 @@ from smm_api import MultiPanel
 from sms_api import VakSMS
 from services_config import TELEGRAM_SERVICES
 from sms_prices import TELEGRAM_SMS_PRICES, get_cheapest_by_country
+from validators import validate_url, validate_quantity, validate_amount, rate_limiter, detect_platform_from_url
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -4822,6 +4823,7 @@ async def process_miniapp_amount(message: Message, state: FSMContext):
 
 @router.message(OrderState.waiting_for_link)
 async def process_link(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     link = message.text.strip()
     
     if "Bekor" in link or "bekor" in link:
@@ -4829,11 +4831,22 @@ async def process_link(message: Message, state: FSMContext):
         await message.answer("❌ Bekor qilindi.", reply_markup=main_menu(message.from_user.id))
         return
     
-    if not link.startswith(("http://", "https://", "t.me/", "@")):
-        await message.answer("❌ Noto'g'ri format. Havola yoki @username yuboring:")
+    # Rate limiting - spam oldini olish
+    if not rate_limiter.is_allowed(user_id, 'order_link', max_requests=20, window_seconds=60):
+        remaining = rate_limiter.get_remaining_time(user_id, 'order_link', 60)
+        await message.answer(f"⏳ Juda ko'p so'rov. {remaining} sekund kuting.")
         return
     
+    # State dan platform ma'lumotini olish
     data = await state.get_data()
+    platform = data.get("platform", None)
+    
+    # Kengaytirilgan URL validatsiyasi
+    is_valid, error_msg = validate_url(link, platform)
+    if not is_valid:
+        await message.answer(f"❌ {error_msg}\n\n💡 To'g'ri format:\n• https://instagram.com/username\n• https://t.me/channel/123\n• @username (Telegram uchun)")
+        return
+    
     min_qty = data.get("min_qty", 100)
     max_qty = data.get("max_qty", 1000000)
     
@@ -4847,6 +4860,7 @@ async def process_link(message: Message, state: FSMContext):
 
 @router.message(OrderState.waiting_for_quantity)
 async def process_quantity(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     text = message.text.strip()
     
     if "Bekor" in text or "bekor" in text:
@@ -4858,16 +4872,19 @@ async def process_quantity(message: Message, state: FSMContext):
     min_qty = data.get("min_qty", 100)
     max_qty = data.get("max_qty", 1000000)
     
+    # Raqamga aylantirish
     try:
-        quantity = int(text)
-        if quantity < min_qty:
-            await message.answer(f"❌ Minimum {min_qty:,} ta. Qayta kiriting:")
-            return
-        if quantity > max_qty:
-            await message.answer(f"❌ Maximum {max_qty:,} ta. Qayta kiriting:")
-            return
+        quantity = int(text.replace(',', '').replace(' ', ''))
     except ValueError:
-        await message.answer("❌ Raqam kiriting:")
+        await message.answer("❌ Faqat raqam kiriting (masalan: 1000):")
+        return
+    
+    # Validatsiya
+    if quantity < min_qty:
+        await message.answer(f"❌ Minimum {min_qty:,} ta.\n\n🔢 Qayta kiriting:")
+        return
+    if quantity > max_qty:
+        await message.answer(f"❌ Maximum {max_qty:,} ta.\n\n🔢 Qayta kiriting:")
         return
     
     price_per_1000 = data.get("price_per_1000", 0)
@@ -4895,39 +4912,60 @@ async def confirm_order_callback(call: CallbackQuery, state: FSMContext):
         return
     
     user_id = call.from_user.id
-    balance = get_balance(user_id)
-    
     data = await state.get_data()
     total_price = data.get("total_price", 0)
-    
-    if balance < total_price:
-        await call.message.edit_text(
-            f"❌ Balans yetarli emas!\n\nSizning balansingiz: {balance:,} so'm\nKerak: {total_price:,} so'm\n\nBalansni to'ldiring: /balance"
-        )
-        await state.clear()
-        return
-    
     service_key = data.get("service_key")
     link = data.get("link")
     quantity = data.get("quantity")
+    service_name = data.get("service_name")
     
-    # Balansdan yechish
-    update_balance(user_id, -total_price)
+    # ATOMIC TRANSACTION - balans tekshirish + yechish + buyurtma yaratish
+    from database import create_order_with_balance_deduction
+    order_id, status = create_order_with_balance_deduction(
+        user_id, service_key, link, quantity, total_price
+    )
     
-    # Bazaga qo'shish
-    order_id = add_order(user_id, service_key, link, quantity, total_price)
+    if status == "insufficient_balance":
+        balance = get_balance(user_id)
+        await call.message.edit_text(
+            f"❌ <b>Balans yetarli emas!</b>\n\n"
+            f"💳 Sizning balansingiz: <b>{balance:,}</b> so'm\n"
+            f"💰 Kerakli summa: <b>{total_price:,}</b> so'm\n"
+            f"📊 Yetishmayapti: <b>{total_price - balance:,}</b> so'm\n\n"
+            f"💵 Balansni to'ldiring: /balance"
+        )
+        await state.clear()
+        await call.answer("❌ Balans yetarli emas!", show_alert=True)
+        return
     
+    if order_id is None:
+        await call.message.edit_text(
+            f"❌ <b>Xatolik yuz berdi!</b>\n\n"
+            f"Buyurtma yaratishda muammo bo'ldi.\n"
+            f"Iltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.\n\n"
+            f"Xatolik: {status}"
+        )
+        await state.clear()
+        await call.answer("❌ Xatolik!", show_alert=True)
+        return
+    
+    # Muvaffaqiyatli
+    new_balance = get_balance(user_id)
     await call.message.edit_text(
         f"✅ <b>Buyurtma muvaffaqiyatli qabul qilindi!</b>\n\n"
-        f"📦 Xizmat: {data.get('service_name')}\n"
+        f"📦 Xizmat: {service_name}\n"
+        f"🔗 Havola: {link[:50]}{'...' if len(link) > 50 else ''}\n"
         f"📊 Miqdor: {quantity:,} ta\n"
         f"💰 Narx: {total_price:,} so'm\n"
-        f"🆔 Buyurtma raqami: #{order_id}\n\n"
+        f"🆔 Buyurtma raqami: <b>#{order_id}</b>\n\n"
+        f"💳 Qolgan balans: <b>{new_balance:,}</b> so'm\n\n"
         f"📋 Buyurtma holati: /orders"
     )
     
+    logger.info(f"Order created: #{order_id} by user {user_id}, price: {total_price}")
+    
     await state.clear()
-    await call.answer()
+    await call.answer("✅ Buyurtma qabul qilindi!")
 
 
 @router.callback_query(F.data == "cancel_order")

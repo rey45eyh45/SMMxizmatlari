@@ -4,10 +4,16 @@ PROFESSIONAL SMM PANEL API INTEGRATSIYASI
 Multi-Panel qo'llab-quvvatlash: Peakerr + SMMMain
 Eng arzon narxlarni avtomatik tanlash
 + CACHE TIZIMI - 10x tezlik!
++ RETRY MEXANIZMI - ishonchlilik!
 """
 
 import requests
+import logging
+import time
+from functools import wraps
 from config import SMM_API_KEY, SMM_API_URL
+
+logger = logging.getLogger(__name__)
 
 # Cache import
 try:
@@ -26,21 +32,91 @@ except ImportError:
     SMMMAIN_API_URL = "https://smmmain.com/api/v2"
 
 
+# ==================== RETRY DECORATOR ====================
+def retry_on_failure(max_retries=3, delay=1, backoff=2, exceptions=(requests.RequestException,)):
+    """
+    Retry decorator for API calls.
+    max_retries: Maximum number of retries
+    delay: Initial delay between retries (seconds)
+    backoff: Multiplier for delay after each retry
+    exceptions: Tuple of exceptions to catch
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < max_retries:
+                        logger.warning(f"{func.__name__} failed (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {current_delay}s...")
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+                    else:
+                        logger.error(f"{func.__name__} failed after {max_retries + 1} attempts: {e}")
+            
+            return {"error": str(last_exception), "retry_exhausted": True}
+        return wrapper
+    return decorator
+
+
 class SMMPanel:
     """Asosiy SMM Panel API class"""
+    
+    # API sozlamalari
+    DEFAULT_TIMEOUT = 30
+    MAX_RETRIES = 3
     
     def __init__(self, api_url=None, api_key=None, name="Peakerr"):
         self.api_key = api_key or SMM_API_KEY
         self.api_url = api_url or SMM_API_URL
         self.name = name
     
-    def _make_request(self, data):
-        """API so'rov yuborish"""
+    @retry_on_failure(max_retries=3, delay=1, backoff=2)
+    def _make_request(self, data, timeout=None):
+        """API so'rov yuborish - retry va timeout bilan"""
+        if not self.api_key:
+            logger.warning(f"{self.name}: API key not configured")
+            return {"error": "API key not configured"}
+        
         data['key'] = self.api_key
+        timeout = timeout or self.DEFAULT_TIMEOUT
+        
         try:
-            response = requests.post(self.api_url, data=data, timeout=30)
-            return response.json()
+            response = requests.post(
+                self.api_url, 
+                data=data, 
+                timeout=timeout,
+                headers={'User-Agent': 'SMM-Bot/1.0'}
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            # API xatosini tekshirish
+            if isinstance(result, dict) and 'error' in result:
+                logger.warning(f"{self.name} API error: {result['error']}")
+            
+            return result
+            
+        except requests.Timeout:
+            logger.error(f"{self.name}: Request timeout after {timeout}s")
+            raise
+        except requests.ConnectionError as e:
+            logger.error(f"{self.name}: Connection error: {e}")
+            raise
+        except requests.HTTPError as e:
+            logger.error(f"{self.name}: HTTP error: {e}")
+            return {"error": f"HTTP error: {e.response.status_code}"}
+        except ValueError as e:
+            logger.error(f"{self.name}: JSON parse error: {e}")
+            return {"error": "Invalid JSON response"}
         except Exception as e:
+            logger.error(f"{self.name}: Unexpected error: {e}")
             return {"error": str(e)}
     
     def get_services(self, use_cache=True):
