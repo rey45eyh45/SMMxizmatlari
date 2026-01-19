@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Wallet, 
@@ -7,10 +8,12 @@ import {
   Crown, 
   ChevronRight,
   Sparkles,
-  User
+  User,
+  RefreshCw
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
+import { userAPI } from '../lib/api'
 import { PlatformCard, Card, Loading } from '../components'
 import { mockPlatforms } from '../lib/mockData'
 
@@ -18,6 +21,33 @@ export default function Home() {
   const navigate = useNavigate()
   const { hapticFeedback, user: tgUser } = useTelegram()
   const { user, isLoading, error } = useAuth()
+  const [balance, setBalance] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Balansni serverdan olish
+  const refreshBalance = useCallback(async () => {
+    if (!user?.user_id) return
+    
+    try {
+      setIsRefreshing(true)
+      const response = await userAPI.getById(user.user_id)
+      if (response.success && response.user) {
+        setBalance(response.user.balance || 0)
+      }
+    } catch (error) {
+      console.error('Error refreshing balance:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [user?.user_id])
+
+  // Sahifa ochilganda balans olish
+  useEffect(() => {
+    if (user?.user_id) {
+      setBalance(user.balance || 0)
+      refreshBalance()
+    }
+  }, [user?.user_id])
 
   if (isLoading) {
     return <Loading />
@@ -39,7 +69,6 @@ export default function Home() {
   }
 
   const displayName = user.full_name || tgUser?.first_name || 'Foydalanuvchi'
-  const balance = user.balance || 0
   const photoUrl = tgUser?.photo_url
 
   const handleNavigation = (path: string) => {
@@ -87,8 +116,21 @@ export default function Home() {
       >
         <Card 
           onClick={() => handleNavigation('/balance')}
-          className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-5"
+          className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-5 relative"
         >
+          {/* Yangilash tugmasi */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              hapticFeedback?.impact?.('light')
+              refreshBalance()
+            }}
+            className={`absolute top-3 right-3 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
+            disabled={isRefreshing}
+          >
+            <RefreshCw size={16} />
+          </button>
+          
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/80 text-sm">Balansingiz</p>

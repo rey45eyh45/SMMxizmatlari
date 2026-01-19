@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, History, TrendingUp, CreditCard } from 'lucide-react'
+import { Plus, History, TrendingUp, CreditCard, RefreshCw } from 'lucide-react'
 import { Card, Button, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
+import { userAPI } from '../lib/api'
 import type { Payment } from '../types'
 
 export default function Balance() {
@@ -13,8 +14,33 @@ export default function Balance() {
   const { user, isLoading: authLoading } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [balance, setBalance] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const balance = user?.balance || 0
+  // Balansni serverdan yangilash
+  const refreshBalance = useCallback(async () => {
+    if (!user?.user_id) return
+    
+    try {
+      setIsRefreshing(true)
+      const response = await userAPI.getById(user.user_id)
+      if (response.success && response.user) {
+        setBalance(response.user.balance || 0)
+      }
+    } catch (error) {
+      console.error('Error refreshing balance:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [user?.user_id])
+
+  // Sahifa ochilganda balansni yangilash
+  useEffect(() => {
+    if (user?.user_id) {
+      setBalance(user.balance || 0)
+      refreshBalance()
+    }
+  }, [user?.user_id])
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -22,10 +48,10 @@ export default function Balance() {
       
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/payments/${user.user_id}`)
+        const response = await fetch(`/api/user/${user.user_id}/payments`)
         const data = await response.json()
-        if (data.success && data.payments) {
-          setPayments(data.payments)
+        if (Array.isArray(data)) {
+          setPayments(data)
         }
       } catch (error) {
         console.error('Error fetching payments:', error)
@@ -47,7 +73,19 @@ export default function Balance() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
       >
-        <Card className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-6 text-center">
+        <Card className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-6 text-center relative">
+          {/* Yangilash tugmasi */}
+          <button
+            onClick={() => {
+              hapticFeedback?.impact?.('light')
+              refreshBalance()
+            }}
+            className={`absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
+            disabled={isRefreshing}
+          >
+            <RefreshCw size={18} />
+          </button>
+          
           <p className="text-white/80">Balansingiz</p>
           <p className="text-4xl font-bold mt-2">
             {balance.toLocaleString()}
