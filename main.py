@@ -4674,17 +4674,22 @@ async def miniapp_approve_payment(call: CallbackQuery):
         amount_str = match.group(1).replace(",", "").replace(" ", "")
         try:
             amount = int(amount_str)
-        except:
+            logger.info(f"Parsed amount from caption: {amount}")
+        except Exception as e:
+            logger.error(f"Failed to parse amount: {e}")
             amount = 0
     
     if amount <= 0:
+        logger.warning(f"Amount is 0 or negative. Caption: {caption}")
         await call.answer("⚠️ Summa topilmadi! To'liq emas tugmasini ishlating.", show_alert=True)
         return
     
     # Balansga qo'shish
+    logger.info(f"Updating balance for user {user_id} with amount {amount}")
     success = update_balance(user_id, amount)
     
     if not success:
+        logger.error(f"Failed to update balance for user {user_id}")
         await call.answer("❌ Balansni yangilashda xatolik!", show_alert=True)
         return
     

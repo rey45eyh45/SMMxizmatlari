@@ -13,6 +13,7 @@ load_dotenv(env_path)
 # Bot konfiguratsiyasi
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+BOT_API_URL = os.getenv("BOT_API_URL", "http://localhost:8000")  # Bot API URL (Railway yoki local)
 
 # Ma'lumotlar bazasi
 DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "smm_bot.db"
