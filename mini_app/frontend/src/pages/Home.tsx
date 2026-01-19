@@ -17,7 +17,7 @@ import { PlatformCard, Card, Loading } from '../components'
 import { mockPlatforms } from '../lib/mockData'
 
 // Admin IDlari (config.py dan)
-const ADMIN_IDS = [6709313399]; // ADMIN_ID ni qo'shing
+const ADMIN_IDS = [5425876649]; // Sizning ADMIN_ID
 
 export default function Home() {
   const navigate = useNavigate()
