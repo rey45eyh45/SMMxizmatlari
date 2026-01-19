@@ -13,38 +13,32 @@ import {
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
-import { userAPI } from '../lib/api'
 import { PlatformCard, Card, Loading } from '../components'
 import { mockPlatforms } from '../lib/mockData'
 
 export default function Home() {
   const navigate = useNavigate()
   const { hapticFeedback, user: tgUser } = useTelegram()
-  const { user, isLoading, error } = useAuth()
-  const [balance, setBalance] = useState(0)
+  const { user, isLoading, error, refetchUser } = useAuth()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Balansni serverdan olish
+  // Balansni serverdan olish - AuthProvider orqali
   const refreshBalance = useCallback(async () => {
     if (!user?.user_id) return
     
     try {
       setIsRefreshing(true)
-      const response = await userAPI.getById(user.user_id)
-      if (response.success && response.user) {
-        setBalance(response.user.balance || 0)
-      }
+      await refetchUser()
     } catch (error) {
       console.error('Error refreshing balance:', error)
     } finally {
       setIsRefreshing(false)
     }
-  }, [user?.user_id])
+  }, [user?.user_id, refetchUser])
 
   // Sahifa ochilganda balans olish
   useEffect(() => {
     if (user?.user_id) {
-      setBalance(user.balance || 0)
       refreshBalance()
     }
   }, [user?.user_id])
@@ -135,7 +129,7 @@ export default function Home() {
             <div>
               <p className="text-white/80 text-sm">Balansingiz</p>
               <p className="text-3xl font-bold mt-1">
-                {balance.toLocaleString()} <span className="text-lg">so'm</span>
+                {(user?.balance || 0).toLocaleString()} <span className="text-lg">so'm</span>
               </p>
             </div>
             <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">

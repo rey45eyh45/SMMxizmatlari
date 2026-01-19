@@ -5,39 +5,33 @@ import { Plus, History, TrendingUp, CreditCard, RefreshCw } from 'lucide-react'
 import { Card, Button, Loading } from '../components'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
-import { userAPI } from '../lib/api'
 import type { Payment } from '../types'
 
 export default function Balance() {
   const navigate = useNavigate()
   const { hapticFeedback } = useTelegram()
-  const { user, isLoading: authLoading } = useAuth()
+  const { user, isLoading: authLoading, refetchUser } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [balance, setBalance] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Balansni serverdan yangilash
+  // Balansni serverdan yangilash - AuthProvider orqali
   const refreshBalance = useCallback(async () => {
     if (!user?.user_id) return
     
     try {
       setIsRefreshing(true)
-      const response = await userAPI.getById(user.user_id)
-      if (response.success && response.user) {
-        setBalance(response.user.balance || 0)
-      }
+      await refetchUser()
     } catch (error) {
       console.error('Error refreshing balance:', error)
     } finally {
       setIsRefreshing(false)
     }
-  }, [user?.user_id])
+  }, [user?.user_id, refetchUser])
 
   // Sahifa ochilganda balansni yangilash
   useEffect(() => {
     if (user?.user_id) {
-      setBalance(user.balance || 0)
       refreshBalance()
     }
   }, [user?.user_id])
@@ -88,7 +82,7 @@ export default function Balance() {
           
           <p className="text-white/80">Balansingiz</p>
           <p className="text-4xl font-bold mt-2">
-            {balance.toLocaleString()}
+            {(user?.balance || 0).toLocaleString()}
             <span className="text-xl ml-2">so'm</span>
           </p>
           
