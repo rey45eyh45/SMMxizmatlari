@@ -11,9 +11,11 @@ import ServiceOrder from './pages/ServiceOrder'
 import Orders from './pages/Orders'
 import Balance from './pages/Balance'
 import Deposit from './pages/Deposit'
+import ClickDeposit from './pages/ClickDeposit'
 import Referral from './pages/Referral'
 import SMS from './pages/SMS'
 import Premium from './pages/Premium'
+import Admin from './pages/Admin'
 
 // Layout
 import Layout from './components/Layout'
@@ -49,9 +51,11 @@ function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/balance" element={<Balance />} />
             <Route path="/deposit" element={<Deposit />} />
+            <Route path="/deposit/click" element={<ClickDeposit />} />
             <Route path="/referral" element={<Referral />} />
             <Route path="/sms" element={<SMS />} />
             <Route path="/premium" element={<Premium />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
         </Layout>
       </BrowserRouter>

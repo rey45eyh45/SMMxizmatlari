@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 
 from .config import CORS_ORIGINS
 from .routers import auth, user, services, orders, payments, sms
+from .routers import click as click_router
+from .database import Database
 
 
 @asynccontextmanager
@@ -16,6 +18,8 @@ async def lifespan(app: FastAPI):
     """Application lifecycle"""
     # Startup
     print("🚀 SMM Mini App Backend ishga tushmoqda...")
+    # Click to'lovlar jadvalini yaratish
+    Database.init_click_payments_table()
     yield
     # Shutdown
     print("👋 SMM Mini App Backend to'xtatilmoqda...")
@@ -47,6 +51,11 @@ app.include_router(services.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(sms.router, prefix="/api")
+app.include_router(click_router.router, prefix="/api")
+
+# Admin panel router
+from .routers import admin as admin_router
+app.include_router(admin_router.router)
 
 
 @app.get("/")

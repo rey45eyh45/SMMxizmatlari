@@ -137,6 +137,64 @@ export const paymentsAPI = {
   }
 }
 
+// ==================== CLICK TO'LOV ====================
+
+export interface ClickPaymentResponse {
+  success: boolean
+  payment_id?: number
+  payment_url?: string
+  amount?: number
+  error?: string
+}
+
+export interface ClickPaymentStatus {
+  success: boolean
+  payment_id?: number
+  amount?: number
+  status?: string
+  created_at?: string
+  completed_at?: string
+  error?: string
+}
+
+export const clickAPI = {
+  /**
+   * Click orqali yangi to'lov yaratish
+   * @param amount To'lov miqdori (min 1000 so'm)
+   * @returns payment_url - foydalanuvchi shu URLga o'tib to'lov qiladi
+   */
+  createPayment: async (amount: number): Promise<ClickPaymentResponse> => {
+    const { data } = await api.post('/api/click/create', { amount })
+    return data
+  },
+  
+  /**
+   * Click to'lov holatini tekshirish
+   * @param paymentId To'lov ID
+   */
+  getPaymentStatus: async (paymentId: number): Promise<ClickPaymentStatus> => {
+    const { data } = await api.get(`/api/click/status/${paymentId}`)
+    return data
+  },
+  
+  /**
+   * Mening Click to'lovlarim ro'yxati
+   */
+  getMyPayments: async (): Promise<{
+    success: boolean
+    payments: Array<{
+      id: number
+      amount: number
+      status: string
+      created_at: string
+      completed_at?: string
+    }>
+  }> => {
+    const { data } = await api.get('/api/click/my-payments')
+    return data
+  }
+}
+
 // ==================== PLATFORMS & SERVICES ====================
 
 export const servicesAPI = {
@@ -202,6 +260,74 @@ export const smsAPI = {
 export const settingsAPI = {
   getPublic: async (): Promise<any> => {
     const { data } = await api.get('/api/settings')
+    return data
+  }
+}
+
+// ==================== ADMIN ====================
+
+export const adminAPI = {
+  getDashboard: async (adminId: number, adminHash: string): Promise<any> => {
+    const { data } = await api.get(`/api/admin/dashboard?user_id=${adminId}&admin_hash=${adminHash}`)
+    return data
+  },
+  
+  getUsers: async (adminId: number, adminHash: string, page = 1, limit = 20, search = ''): Promise<any> => {
+    const { data } = await api.get(`/api/admin/users?user_id=${adminId}&admin_hash=${adminHash}&page=${page}&limit=${limit}&search=${search}`)
+    return data
+  },
+  
+  getUser: async (adminId: number, adminHash: string, userId: number): Promise<any> => {
+    const { data } = await api.get(`/api/admin/users/${userId}?user_id=${adminId}&admin_hash=${adminHash}`)
+    return data
+  },
+  
+  updateUser: async (adminId: number, adminHash: string, userId: number, updates: any): Promise<any> => {
+    const { data } = await api.put(`/api/admin/users/${userId}?user_id=${adminId}&admin_hash=${adminHash}`, updates)
+    return data
+  },
+  
+  changeBalance: async (adminId: number, adminHash: string, userId: number, amount: number, reason = ''): Promise<any> => {
+    const { data } = await api.post(`/api/admin/users/balance?user_id=${adminId}&admin_hash=${adminHash}`, {
+      user_id: userId,
+      amount,
+      reason
+    })
+    return data
+  },
+  
+  getOrders: async (adminId: number, adminHash: string, page = 1, limit = 20, status = ''): Promise<any> => {
+    const { data } = await api.get(`/api/admin/orders?user_id=${adminId}&admin_hash=${adminHash}&page=${page}&limit=${limit}${status ? `&status=${status}` : ''}`)
+    return data
+  },
+  
+  updateOrder: async (adminId: number, adminHash: string, orderId: number, updates: any): Promise<any> => {
+    const { data } = await api.put(`/api/admin/orders/${orderId}?user_id=${adminId}&admin_hash=${adminHash}`, updates)
+    return data
+  },
+  
+  getPayments: async (adminId: number, adminHash: string, page = 1, limit = 20, status = ''): Promise<any> => {
+    const { data } = await api.get(`/api/admin/payments?user_id=${adminId}&admin_hash=${adminHash}&page=${page}&limit=${limit}${status ? `&status=${status}` : ''}`)
+    return data
+  },
+  
+  approvePayment: async (adminId: number, adminHash: string, paymentId: number): Promise<any> => {
+    const { data } = await api.post(`/api/admin/payments/${paymentId}/approve?user_id=${adminId}&admin_hash=${adminHash}`)
+    return data
+  },
+  
+  rejectPayment: async (adminId: number, adminHash: string, paymentId: number): Promise<any> => {
+    const { data } = await api.post(`/api/admin/payments/${paymentId}/reject?user_id=${adminId}&admin_hash=${adminHash}`)
+    return data
+  },
+  
+  getSettings: async (adminId: number, adminHash: string): Promise<any> => {
+    const { data } = await api.get(`/api/admin/settings?user_id=${adminId}&admin_hash=${adminHash}`)
+    return data
+  },
+  
+  updateSettings: async (adminId: number, adminHash: string, settings: any): Promise<any> => {
+    const { data } = await api.put(`/api/admin/settings?user_id=${adminId}&admin_hash=${adminHash}`, settings)
     return data
   }
 }

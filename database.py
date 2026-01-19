@@ -179,6 +179,26 @@ def init_db():
     
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_premium_requests_status ON premium_requests(status)')
     
+    # ==================== CLICK TO'LOVLAR JADVALI ====================
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS click_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT DEFAULT 'pending',
+            click_trans_id INTEGER,
+            click_paydoc_id INTEGER,
+            error_code INTEGER,
+            created_at TEXT,
+            completed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    ''')
+    
+    # Click to'lovlar indexlari
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_click_payments_user ON click_payments(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_click_payments_status ON click_payments(status)')
+    
     # ==================== SOZLAMALAR JADVALI ====================
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS settings (
@@ -890,6 +910,103 @@ def update_premium_request_status(request_id, status, admin_message_id=None):
             return True
     except Exception as e:
         logger.error(f"update_premium_request_status error: {e}")
+        return False
+
+
+# ==================== CLICK TO'LOVLAR FUNKSIYALARI ====================
+
+def add_click_payment(user_id, amount):
+    """Yangi Click to'lov yaratish"""
+    try:
+        with get_db_transaction() as (conn, cursor):
+            cursor.execute('''
+                INSERT INTO click_payments (user_id, amount, status, created_at)
+                VALUES (?, ?, 'pending', ?)
+            ''', (user_id, amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            return cursor.lastrowid
+    except Exception as e:
+        logger.error(f"add_click_payment error: {e}")
+        return None
+
+
+def get_click_payment(payment_id):
+    """Click to'lovni olish"""
+    try:
+        with get_db_connection() as (conn, cursor):
+            cursor.execute("SELECT * FROM click_payments WHERE id = ?", (payment_id,))
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            return None
+    except Exception as e:
+        logger.error(f"get_click_payment error: {e}")
+        return None
+
+
+def update_click_payment_status(payment_id, status, click_trans_id=None, click_paydoc_id=None, error_code=None):
+    """Click to'lov holatini yangilash"""
+    try:
+        with get_db_transaction() as (conn, cursor):
+            update_fields = ["status = ?"]
+            values = [status]
+            
+            if click_trans_id:
+                update_fields.append("click_trans_id = ?")
+                values.append(click_trans_id)
+            
+            if click_paydoc_id:
+                update_fields.append("click_paydoc_id = ?")
+                values.append(click_paydoc_id)
+            
+            if error_code is not None:
+                update_fields.append("error_code = ?")
+                values.append(error_code)
+            
+            if status == 'completed':
+                update_fields.append("completed_at = ?")
+                values.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            
+            values.append(payment_id)
+            
+            query = f"UPDATE click_payments SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, values)
+            return True
+    except Exception as e:
+        logger.error(f"update_click_payment_status error: {e}")
+        return False
+
+
+def get_user_click_payments(user_id, limit=20):
+    """Foydalanuvchining Click to'lovlarini olish"""
+    try:
+        with get_db_connection() as (conn, cursor):
+            cursor.execute('''
+                SELECT * FROM click_payments 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (user_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"get_user_click_payments error: {e}")
+        return []
+
+
+def get_pending_click_payments():
+    """Kutilayotgan Click to'lovlarni olish (admin uchun)"""
+    try:
+        with get_db_connection() as (conn, cursor):
+            cursor.execute('''
+                SELECT cp.*, u.username, u.full_name 
+                FROM click_payments cp
+                LEFT JOIN users u ON cp.user_id = u.user_id
+                WHERE cp.status = 'pending' OR cp.status = 'preparing'
+                ORDER BY cp.created_at DESC
+            ''')
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"get_pending_click_payments error: {e}")
+        return []
         return False
 
 

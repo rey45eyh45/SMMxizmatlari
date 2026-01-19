@@ -8,17 +8,24 @@ import {
   Crown, 
   ChevronRight,
   Sparkles,
-  User
+  User,
+  Shield
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
 import { PlatformCard, Card, Loading } from '../components'
 import { mockPlatforms } from '../lib/mockData'
 
+// Admin IDlari (config.py dan)
+const ADMIN_IDS = [6709313399]; // ADMIN_ID ni qo'shing
+
 export default function Home() {
   const navigate = useNavigate()
   const { hapticFeedback, user: tgUser } = useTelegram()
   const { user, isLoading, error, refetchUser } = useAuth()
+
+  // Admin tekshirish
+  const isAdmin = user?.user_id ? ADMIN_IDS.includes(user.user_id) : false
 
   // Sahifa ochilganda balans olish
   useEffect(() => {
@@ -205,6 +212,33 @@ export default function Home() {
           </div>
         </Card>
       </motion.div>
+
+      {/* Admin Panel - faqat adminlar uchun */}
+      {isAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card 
+            onClick={() => handleNavigation('/admin')}
+            className="bg-gradient-to-r from-gray-700 to-gray-900 text-white border border-purple-500/50"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <Shield size={24} className="text-purple-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">🔐 Admin Panel</h3>
+                <p className="text-white/70 text-sm mt-0.5">
+                  Boshqaruv paneli
+                </p>
+              </div>
+              <ChevronRight size={20} className="text-purple-400" />
+            </div>
+          </Card>
+        </motion.div>
+      )}
     </div>
   )
 }

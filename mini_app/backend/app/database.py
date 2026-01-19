@@ -276,6 +276,104 @@ class Database:
                 return dict(premium)
             return None
     
+    # ==================== CLICK TO'LOVLARI ====================
+    
+    @staticmethod
+    def init_click_payments_table():
+        """Click to'lovlar jadvalini yaratish"""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS click_payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    amount REAL NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    click_trans_id INTEGER,
+                    click_paydoc_id INTEGER,
+                    error_code INTEGER,
+                    created_at TEXT,
+                    completed_at TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            ''')
+            conn.commit()
+    
+    @staticmethod
+    def add_click_payment(user_id: int, amount: float) -> int:
+        """Yangi Click to'lov yaratish"""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO click_payments (user_id, amount, status, created_at)
+                VALUES (?, ?, 'pending', ?)
+            ''', (user_id, amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            return cursor.lastrowid
+    
+    @staticmethod
+    def get_click_payment(payment_id: int) -> Optional[Dict[str, Any]]:
+        """Click to'lovni olish"""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM click_payments WHERE id = ?
+            ''', (payment_id,))
+            payment = cursor.fetchone()
+            if payment:
+                return dict(payment)
+            return None
+    
+    @staticmethod
+    def update_click_payment_status(
+        payment_id: int, 
+        status: str, 
+        click_trans_id: int = None,
+        click_paydoc_id: int = None,
+        error_code: int = None
+    ):
+        """Click to'lov holatini yangilash"""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            update_fields = ["status = ?"]
+            values = [status]
+            
+            if click_trans_id:
+                update_fields.append("click_trans_id = ?")
+                values.append(click_trans_id)
+            
+            if click_paydoc_id:
+                update_fields.append("click_paydoc_id = ?")
+                values.append(click_paydoc_id)
+            
+            if error_code is not None:
+                update_fields.append("error_code = ?")
+                values.append(error_code)
+            
+            if status == 'completed':
+                update_fields.append("completed_at = ?")
+                values.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            
+            values.append(payment_id)
+            
+            query = f"UPDATE click_payments SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, values)
+            conn.commit()
+    
+    @staticmethod
+    def get_user_click_payments(user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
+        """Foydalanuvchining Click to'lovlarini olish"""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM click_payments 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (user_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    
     # ==================== STATISTIKA ====================
     
     @staticmethod

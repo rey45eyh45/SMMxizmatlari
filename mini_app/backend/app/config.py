@@ -15,6 +15,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 BOT_API_URL = os.getenv("BOT_API_URL", "http://localhost:8000")  # Bot API URL (Railway yoki local)
 
+# Admin ID'lar ro'yxati (bir nechta admin qo'shish uchun)
+ADMIN_IDS = [ADMIN_ID]  # Qo'shimcha adminlar qo'shish uchun ro'yxatga qo'shing
+
 # Ma'lumotlar bazasi
 DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "smm_bot.db"
 DATABASE_NAME = str(DATABASE_PATH)
@@ -29,6 +32,12 @@ SMMMAIN_API_KEY = os.getenv("SMMMAIN_API_KEY", "")
 SMS_API_KEY = os.getenv("SMS_API_KEY", "")
 FIVESIM_API_KEY = os.getenv("FIVESIM_API_KEY", "")
 SMSPVA_API_KEY = os.getenv("SMSPVA_API_KEY", "")
+
+# Click to'lov tizimi
+# Click merchant kabinetdan olish: https://merchant.click.uz
+CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "")
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "")
 
 # CORS origins
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")

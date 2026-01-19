@@ -102,6 +102,24 @@ export function useTelegram() {
     }
   }), [tg])
 
+  // Tashqi havolani ochish (Click, Payme va h.k. uchun)
+  const openLink = useCallback((url: string, options?: { try_instant_view?: boolean }) => {
+    if (tg?.openLink) {
+      tg.openLink(url, options)
+    } else {
+      window.open(url, '_blank')
+    }
+  }, [tg])
+
+  // Telegram havolasini ochish (t.me/...)
+  const openTelegramLink = useCallback((url: string) => {
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }, [tg])
+
   return {
     tg,
     user,
@@ -115,6 +133,8 @@ export function useTelegram() {
     hapticFeedback,
     mainButton,
     backButton,
+    openLink,
+    openTelegramLink,
     isInTelegram: !!tg
   }
 }

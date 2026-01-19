@@ -3873,9 +3873,23 @@ async def sms_menu(message: Message):
 
 # ==================== PAYMENT HANDLERS ====================
 
-@router.message(F.text.in_(["💳 Click", "💳 Payme", "💳 Uzum"]))
+@router.message(F.text == "💳 Click")
+async def click_payment(message: Message):
+    """Click to'lov - Mini App orqali"""
+    await message.answer(
+        "💳 <b>Click to'lov tizimi</b>\n\n"
+        "✅ Click orqali to'lov <b>tez orada</b> ishga tushadi!\n\n"
+        "🔧 Hozirda integratsiya jarayonida.\n"
+        "Click orqali qulay va tez to'lov qilish imkoniyati bo'ladi.\n\n"
+        "⏳ <b>Taxminiy muddat:</b> 1-2 kun\n\n"
+        "Hozircha <b>💳 Karta orqali</b> to'lov usulidan foydalaning.",
+        reply_markup=payment_methods()
+    )
+
+
+@router.message(F.text.in_(["💳 Payme", "💳 Uzum"]))
 async def payment_coming_soon(message: Message):
-    """Click, Payme, Uzum - tez orada qo'shiladi"""
+    """Payme, Uzum - tez orada qo'shiladi"""
     await message.answer(
         "🚧 <b>Tez orada qo'shiladi!</b>\n\n"
         "Ushbu to'lov usuli hozircha ishlab chiqish jarayonida.\n"

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, Copy, AlertCircle, Camera, Send, Upload, X, Image } from 'lucide-react'
+import { Check, Copy, AlertCircle, Camera, Send, Upload, X, Image, ChevronRight } from 'lucide-react'
 import { Card, Button, Input } from '../components'
+import { ClickIcon } from '../components/icons'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
 
@@ -197,6 +198,45 @@ export default function Deposit() {
           animate={{ opacity: 1, x: 0 }}
           className="space-y-6"
         >
+          {/* Click - Tezkor to'lov banneri */}
+          <Card
+            onClick={() => {
+              hapticFeedback?.selection?.()
+              // Agar summa kiritilgan bo'lsa, URL'ga qo'shib yuboramiz
+              if (parsedAmount >= minAmount) {
+                navigate(`/deposit/click?amount=${parsedAmount}`)
+              } else {
+                navigate('/deposit/click')
+              }
+            }}
+            className="cursor-pointer bg-[#00AEEF] text-white p-4"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shrink-0">
+                <ClickIcon size={48} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-lg">Click to'lov</p>
+                  <span className="px-2 py-0.5 bg-white/20 text-white text-xs font-medium rounded-full">
+                    Tez ⚡
+                  </span>
+                </div>
+                <p className="text-white/80 text-sm">Avtomatik - 1 daqiqada</p>
+              </div>
+              <ChevronRight size={24} className="text-white/80" />
+            </div>
+          </Card>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-tg-bg text-tg-hint">yoki karta o'tkazma</span>
+            </div>
+          </div>
+
           <Input
             label="Miqdorni kiriting"
             placeholder={`Min: ${minAmount.toLocaleString()} so'm`}
@@ -239,7 +279,7 @@ export default function Deposit() {
               setStep('method')
             }}
           >
-            Davom etish
+            Karta o'tkazmasi bilan to'lash
           </Button>
         </motion.div>
       )}
