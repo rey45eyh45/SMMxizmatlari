@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Wallet, 
@@ -8,8 +8,7 @@ import {
   Crown, 
   ChevronRight,
   Sparkles,
-  User,
-  RefreshCw
+  User
 } from 'lucide-react'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuth } from '../providers'
@@ -20,26 +19,11 @@ export default function Home() {
   const navigate = useNavigate()
   const { hapticFeedback, user: tgUser } = useTelegram()
   const { user, isLoading, error, refetchUser } = useAuth()
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  // Balansni serverdan olish - AuthProvider orqali
-  const refreshBalance = useCallback(async () => {
-    if (!user?.user_id) return
-    
-    try {
-      setIsRefreshing(true)
-      await refetchUser()
-    } catch (error) {
-      console.error('Error refreshing balance:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [user?.user_id, refetchUser])
 
   // Sahifa ochilganda balans olish
   useEffect(() => {
     if (user?.user_id) {
-      refreshBalance()
+      refetchUser()
     }
   }, [user?.user_id])
 
@@ -110,21 +94,8 @@ export default function Home() {
       >
         <Card 
           onClick={() => handleNavigation('/balance')}
-          className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-5 relative"
+          className="bg-gradient-to-r from-tg-button to-blue-600 text-white p-5"
         >
-          {/* Yangilash tugmasi */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              hapticFeedback?.impact?.('light')
-              refreshBalance()
-            }}
-            className={`absolute top-3 right-3 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
-            disabled={isRefreshing}
-          >
-            <RefreshCw size={16} />
-          </button>
-          
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/80 text-sm">Balansingiz</p>
