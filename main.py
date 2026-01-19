@@ -61,6 +61,7 @@ class SMSState(StatesGroup):
 class AdminState(StatesGroup):
     waiting_for_partial_amount = State()  # To'lov tasdiqlash uchun
     waiting_for_miniapp_amount = State()  # Mini App to'lov summasi
+    waiting_for_miniapp_partial_amount = State()  # Mini App qisman to'lov summasi
     waiting_for_cancel_order = State()  # Buyurtma raqamini kutish
     waiting_for_cancel_confirm = State()  # Tasdiqlashni kutish
     waiting_for_user_search = State()  # Foydalanuvchi qidirish
@@ -4043,10 +4044,13 @@ async def receipt_photo_handler(message: Message, state: FSMContext):
     admin_text += f"📍 Usul: Karta orqali\n"
     admin_text += f"\n⏳ Tekshirishni kutmoqda..."
     
-    # Admin ga yuborish - payment_id ni callback ga qo'shish
+    # Admin ga yuborish - bot bilan bir xil tugmalar
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"miniapp_approve_{user_id}_{payment_id}")],
-        [InlineKeyboardButton(text="❌ Rad etish", callback_data=f"miniapp_reject_{user_id}_{payment_id}")]
+        [
+            InlineKeyboardButton(text="⚠️ To'liq emas", callback_data=f"miniapp_partial_{user_id}_{payment_id}"),
+            InlineKeyboardButton(text="❌ Rad etish", callback_data=f"miniapp_reject_{user_id}_{payment_id}")
+        ]
     ])
     
     await bot.send_photo(ADMIN_ID, photo, caption=admin_text, reply_markup=keyboard)
@@ -4080,9 +4084,13 @@ async def receipt_document_handler(message: Message, state: FSMContext):
     admin_text += f"📎 Fayl: {file_name}\n"
     admin_text += f"\n⏳ Tekshirishni kutmoqda..."
     
+    # Admin ga yuborish - bot bilan bir xil tugmalar
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"miniapp_approve_{user_id}_{payment_id}")],
-        [InlineKeyboardButton(text="❌ Rad etish", callback_data=f"miniapp_reject_{user_id}_{payment_id}")]
+        [
+            InlineKeyboardButton(text="⚠️ To'liq emas", callback_data=f"miniapp_partial_{user_id}_{payment_id}"),
+            InlineKeyboardButton(text="❌ Rad etish", callback_data=f"miniapp_reject_{user_id}_{payment_id}")
+        ]
     ])
     
     await bot.send_document(ADMIN_ID, file_id, caption=admin_text, reply_markup=keyboard)
@@ -4694,6 +4702,95 @@ async def miniapp_reject_payment(call: CallbackQuery):
         reply_markup=contact_admin_inline()
     )
     await call.answer("Rad etildi!")
+
+
+@router.callback_query(F.data.startswith('miniapp_partial_'))
+async def miniapp_partial_payment(call: CallbackQuery, state: FSMContext):
+    """Mini App to'lov to'liq emas - admin haqiqiy summani kiritadi"""
+    if call.from_user.id != ADMIN_ID:
+        await call.answer("Sizga ruxsat yo'q!", show_alert=True)
+        return
+    
+    parts = call.data.split("_")
+    user_id = int(parts[2])
+    payment_id = int(parts[3])
+    
+    await state.update_data(
+        miniapp_partial_user_id=user_id,
+        miniapp_partial_payment_id=payment_id,
+        miniapp_partial_message=call.message
+    )
+    
+    await call.message.answer(
+        f"⚠️ <b>To'liq emas</b>\n\n"
+        f"👤 Foydalanuvchi ID: {user_id}\n"
+        f"📝 To'lov ID: #{payment_id}\n\n"
+        f"✏️ Foydalanuvchi qancha pul tashlagan? (faqat raqam yozing):"
+    )
+    await state.set_state(AdminState.waiting_for_miniapp_partial_amount)
+    await call.answer()
+
+
+@router.message(AdminState.waiting_for_miniapp_partial_amount)
+async def process_miniapp_partial_amount(message: Message, state: FSMContext):
+    """Mini App to'lov - admin kiritgan qisman summa"""
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    try:
+        actual_amount = int(message.text.replace(" ", "").replace(",", ""))
+    except ValueError:
+        await message.answer("❌ Noto'g'ri summa! Faqat raqam kiriting:")
+        return
+    
+    if actual_amount <= 0:
+        await message.answer("❌ Summa 0 dan katta bo'lishi kerak!")
+        return
+    
+    data = await state.get_data()
+    user_id = data.get("miniapp_partial_user_id")
+    payment_id = data.get("miniapp_partial_payment_id")
+    original_message = data.get("miniapp_partial_message")
+    
+    # Balansga qo'shish
+    success = update_balance(user_id, actual_amount)
+    
+    if not success:
+        await message.answer(
+            f"❌ <b>Xatolik!</b>\n\n"
+            f"Balansni yangilashda xatolik yuz berdi.\n"
+            f"Qaytadan urinib ko'ring."
+        )
+        return
+    
+    # Original xabardagi captionni yangilash
+    try:
+        await original_message.edit_caption(
+            original_message.caption + f"\n\n⚠️ <b>QISMAN TASDIQLANDI</b>\n💰 Summa: {actual_amount:,} so'm"
+        )
+    except:
+        pass
+    
+    await message.answer(
+        f"✅ <b>Mini App to'lov qisman tasdiqlandi!</b>\n\n"
+        f"👤 Foydalanuvchi ID: {user_id}\n"
+        f"📝 To'lov ID: #{payment_id}\n"
+        f"💰 Tasdiqlangan summa: {actual_amount:,} so'm"
+    )
+    
+    # Foydalanuvchiga xabar
+    await bot.send_message(
+        user_id,
+        f"⚠️ <b>To'lov qisman tasdiqlandi!</b>\n\n"
+        f"📝 To'lov ID: #{payment_id}\n"
+        f"✅ Tasdiqlangan summa: {actual_amount:,} so'm\n\n"
+        f"💳 {actual_amount:,} so'm balansingizga qo'shildi.\n"
+        f"📊 Yangi balans: {get_balance(user_id):,} so'm\n\n"
+        f"💡 Agar xatolik bo'lsa, admin bilan bog'laning.",
+        reply_markup=main_menu(user_id)
+    )
+    
+    await state.clear()
 
 
 @router.callback_query(F.data.startswith('partial_'))

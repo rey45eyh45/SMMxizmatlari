@@ -569,11 +569,14 @@ app.post('/api/payment/upload-receipt', uploadMiddleware, async (req, res) => {
       `📍 Usul: Karta orqali\n\n` +
       `⏳ Tekshirishni kutmoqda...`;
     
-    // Add inline keyboard for admin
+    // Add inline keyboard for admin - bot bilan bir xil 3 ta tugma
     const keyboard = JSON.stringify({
       inline_keyboard: [
         [{ text: '✅ Tasdiqlash', callback_data: `miniapp_approve_${user_id}_${payment_id}` }],
-        [{ text: '❌ Rad etish', callback_data: `miniapp_reject_${user_id}_${payment_id}` }]
+        [
+          { text: '⚠️ To\'liq emas', callback_data: `miniapp_partial_${user_id}_${payment_id}` },
+          { text: '❌ Rad etish', callback_data: `miniapp_reject_${user_id}_${payment_id}` }
+        ]
       ]
     });
     
