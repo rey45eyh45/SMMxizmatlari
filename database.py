@@ -336,11 +336,23 @@ def update_balance(user_id, amount):
     """Balansni yangilash - transaction bilan (race condition oldini olish)"""
     try:
         with get_db_transaction() as (conn, cursor):
-            # Avval balansni tekshirish (agar ayirish bo'lsa)
+            # Foydalanuvchi mavjudligini tekshirish
+            cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+            result = cursor.fetchone()
+            
+            # Agar foydalanuvchi mavjud bo'lmasa - yaratish
+            if result is None:
+                cursor.execute('''
+                    INSERT INTO users (user_id, balance, is_premium, created_at)
+                    VALUES (?, ?, 0, datetime('now'))
+                ''', (user_id, max(0, amount)))
+                logger.info(f"Created new user {user_id} with balance {amount}")
+                return True
+            
+            current_balance = result[0]
+            
+            # Agar ayirish bo'lsa - yetarliligini tekshirish
             if amount < 0:
-                cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
-                result = cursor.fetchone()
-                current_balance = result[0] if result else 0
                 if current_balance + amount < 0:
                     logger.warning(f"Insufficient balance for user {user_id}: {current_balance} + {amount}")
                     return False

@@ -4788,7 +4788,15 @@ async def process_miniapp_amount(message: Message, state: FSMContext):
     original_message = data.get("miniapp_message")
     
     # Balansga qo'shish
-    update_balance(user_id, amount)
+    success = update_balance(user_id, amount)
+    
+    if not success:
+        await message.answer(
+            f"❌ <b>Xatolik!</b>\n\n"
+            f"Balansni yangilashda xatolik yuz berdi.\n"
+            f"Qaytadan urinib ko'ring."
+        )
+        return
     
     # Original xabardagi captionni yangilash
     try:
