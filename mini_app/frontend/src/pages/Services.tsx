@@ -30,7 +30,7 @@ export default function Services() {
               color={platform.color}
               onClick={() => {
                 hapticFeedback?.selection?.()
-                navigate(`/platform/${platform.id}`)
+                navigate(`/services/${platform.id}`)
               }}
             />
           </motion.div>

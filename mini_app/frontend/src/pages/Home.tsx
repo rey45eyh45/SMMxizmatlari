@@ -183,7 +183,7 @@ export default function Home() {
                 emoji={platform.emoji}
                 name={platform.name}
                 color={platform.color}
-                onClick={() => handleNavigation(`/platform/${platform.id}`)}
+                onClick={() => handleNavigation(`/services/${platform.id}`)}
               />
             </motion.div>
           ))}
