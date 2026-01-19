@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTelegram } from '../hooks/useTelegram';
 import { adminAPI } from '../lib/api';
-import { Card, Button, Loading, Input } from '../components';
 
-// Dashboard statistikasi interfeysi
+// ==================== TYPES ====================
 interface DashboardData {
   users: { total: number; today: number };
   orders: { total: number; today: number; pending: number; processing: number; completed: number; canceled: number };
@@ -12,7 +12,6 @@ interface DashboardData {
   weekly_stats: { date: string; orders: number; revenue: number }[];
 }
 
-// User interfeysi
 interface User {
   user_id: number;
   username: string;
@@ -25,7 +24,6 @@ interface User {
   total_spent: number;
 }
 
-// Order interfeysi
 interface Order {
   id: number;
   user_id: number;
@@ -39,7 +37,6 @@ interface Order {
   full_name: string;
 }
 
-// Payment interfeysi
 interface Payment {
   id: number;
   user_id: number;
@@ -53,8 +50,11 @@ interface Payment {
 
 type TabType = 'dashboard' | 'users' | 'orders' | 'payments' | 'settings';
 
+// ==================== MAIN COMPONENT ====================
 const Admin: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useTelegram();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,45 +65,36 @@ const Admin: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   
-  // Pagination
-  const [userPage, setUserPage] = useState(1);
-  const [orderPage, setOrderPage] = useState(1);
-  const [paymentPage, setPaymentPage] = useState(1);
+  // Pagination & filters
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  
-  // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [orderStatus, setOrderStatus] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   
-  // Selected user for detail view
+  // Modals
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [balanceChange, setBalanceChange] = useState('');
+  const [balanceAmount, setBalanceAmount] = useState('');
   
   const adminId = user?.id || 0;
-  const adminHash = 'dev_hash'; // Development mode
+  const adminHash = 'dev_hash';
 
-  // Fetch dashboard
+  // ==================== API CALLS ====================
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       const response = await adminAPI.getDashboard(adminId, adminHash);
-      if (response.success) {
-        setDashboard(response.data);
-      }
+      if (response.success) setDashboard(response.data);
     } catch (err) {
       setError('Dashboard yuklanmadi');
-      console.error(err);
     } finally {
       setLoading(false);
     }
   }, [adminId]);
 
-  // Fetch users
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getUsers(adminId, adminHash, userPage, 20, searchQuery);
+      const response = await adminAPI.getUsers(adminId, adminHash, currentPage, 15, searchQuery);
       if (response.success) {
         setUsers(response.data.users);
         setTotalPages(response.data.pages);
@@ -113,13 +104,12 @@ const Admin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [adminId, userPage, searchQuery]);
+  }, [adminId, currentPage, searchQuery]);
 
-  // Fetch orders
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getOrders(adminId, adminHash, orderPage, 20, orderStatus);
+      const response = await adminAPI.getOrders(adminId, adminHash, currentPage, 15, statusFilter);
       if (response.success) {
         setOrders(response.data.orders);
         setTotalPages(response.data.pages);
@@ -129,13 +119,12 @@ const Admin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [adminId, orderPage, orderStatus]);
+  }, [adminId, currentPage, statusFilter]);
 
-  // Fetch payments
   const fetchPayments = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getPayments(adminId, adminHash, paymentPage, 20, paymentStatus);
+      const response = await adminAPI.getPayments(adminId, adminHash, currentPage, 15, statusFilter);
       if (response.success) {
         setPayments(response.data.payments);
         setTotalPages(response.data.pages);
@@ -145,47 +134,48 @@ const Admin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [adminId, paymentPage, paymentStatus]);
+  }, [adminId, currentPage, statusFilter]);
 
-  // Initial load
+  // Initial & tab change
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
-
-  // Tab change handler
-  useEffect(() => {
+    setCurrentPage(1);
+    setStatusFilter('');
     switch (activeTab) {
-      case 'dashboard':
-        fetchDashboard();
-        break;
-      case 'users':
-        fetchUsers();
-        break;
-      case 'orders':
-        fetchOrders();
-        break;
-      case 'payments':
-        fetchPayments();
-        break;
+      case 'dashboard': fetchDashboard(); break;
+      case 'users': fetchUsers(); break;
+      case 'orders': fetchOrders(); break;
+      case 'payments': fetchPayments(); break;
     }
-  }, [activeTab, fetchDashboard, fetchUsers, fetchOrders, fetchPayments]);
+  }, [activeTab]);
 
-  // Change user balance
-  const handleBalanceChange = async (userId: number, amount: number) => {
+  useEffect(() => {
+    if (activeTab === 'users') fetchUsers();
+    else if (activeTab === 'orders') fetchOrders();
+    else if (activeTab === 'payments') fetchPayments();
+  }, [currentPage, searchQuery, statusFilter]);
+
+  // ==================== HANDLERS ====================
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
+
+  const handleBalanceChange = async () => {
+    if (!selectedUser || !balanceAmount) return;
     try {
-      await adminAPI.changeBalance(adminId, adminHash, userId, amount, 'Admin panel orqali');
-      fetchUsers();
+      await adminAPI.changeBalance(adminId, adminHash, selectedUser.user_id, parseFloat(balanceAmount), 'Admin panel');
       setSelectedUser(null);
-      setBalanceChange('');
+      setBalanceAmount('');
+      fetchUsers();
+      fetchDashboard();
     } catch (err) {
-      setError('Balans o\'zgartirilmadi');
+      setError("Balans o'zgartirilmadi");
     }
   };
 
-  // Approve payment
-  const handleApprovePayment = async (paymentId: number) => {
+  const handleApprovePayment = async (id: number) => {
     try {
-      await adminAPI.approvePayment(adminId, adminHash, paymentId);
+      await adminAPI.approvePayment(adminId, adminHash, id);
       fetchPayments();
       fetchDashboard();
     } catch (err) {
@@ -193,501 +183,578 @@ const Admin: React.FC = () => {
     }
   };
 
-  // Reject payment
-  const handleRejectPayment = async (paymentId: number) => {
+  const handleRejectPayment = async (id: number) => {
     try {
-      await adminAPI.rejectPayment(adminId, adminHash, paymentId);
+      await adminAPI.rejectPayment(adminId, adminHash, id);
       fetchPayments();
     } catch (err) {
-      setError("To'lov rad etilmadi");
+      setError("Xatolik yuz berdi");
     }
   };
 
-  // Format number
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(num);
-  };
-
-  // Format date
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('uz-UZ', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // ==================== HELPERS ====================
+  const formatNumber = (n: number) => new Intl.NumberFormat('uz-UZ').format(n);
+  const formatDate = (d: string) => {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('uz-UZ', {
+      day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
     });
   };
 
-  // Status badge
-  const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-500/20 text-yellow-400',
-      processing: 'bg-blue-500/20 text-blue-400',
-      completed: 'bg-green-500/20 text-green-400',
-      canceled: 'bg-red-500/20 text-red-400',
-      approved: 'bg-green-500/20 text-green-400',
-      rejected: 'bg-red-500/20 text-red-400',
-      partial: 'bg-orange-500/20 text-orange-400'
+  const menuItems = [
+    { id: 'dashboard' as TabType, icon: '📊', label: 'Dashboard', badge: null },
+    { id: 'users' as TabType, icon: '👥', label: 'Foydalanuvchilar', badge: dashboard?.users.total },
+    { id: 'orders' as TabType, icon: '📦', label: 'Buyurtmalar', badge: dashboard?.orders.pending },
+    { id: 'payments' as TabType, icon: '💳', label: "To'lovlar", badge: dashboard?.payments.pending },
+    { id: 'settings' as TabType, icon: '⚙️', label: 'Sozlamalar', badge: null },
+  ];
+
+  // ==================== COMPONENTS ====================
+  const StatusBadge = ({ status }: { status: string }) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      processing: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      canceled: 'bg-red-500/20 text-red-400 border-red-500/30',
+      approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
     };
     const labels: Record<string, string> = {
-      pending: 'Kutilmoqda',
-      processing: 'Jarayonda',
-      completed: 'Bajarildi',
-      canceled: 'Bekor',
-      approved: 'Tasdiqlangan',
-      rejected: 'Rad etilgan',
-      partial: 'Qisman'
+      pending: '⏳ Kutilmoqda',
+      processing: '🔄 Jarayonda',
+      completed: '✅ Bajarildi',
+      canceled: '❌ Bekor',
+      approved: '✅ Tasdiqlangan',
+      rejected: '❌ Rad etilgan',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-500/20 text-gray-400'}`}>
+      <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${styles[status] || 'bg-gray-500/20 text-gray-400'}`}>
         {labels[status] || status}
       </span>
     );
   };
 
-  // Tabs
-  const tabs: { id: TabType; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'users', label: 'Foydalanuvchilar', icon: '👥' },
-    { id: 'orders', label: 'Buyurtmalar', icon: '📦' },
-    { id: 'payments', label: "To'lovlar", icon: '💳' },
-    { id: 'settings', label: 'Sozlamalar', icon: '⚙️' }
-  ];
-
-  if (loading && !dashboard) {
-    return <Loading text="Admin panel yuklanmoqda..." />;
-  }
-
-  return (
-    <div className="min-h-screen bg-[#0f0f0f] pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4">
-        <h1 className="text-xl font-bold text-white">🔐 Admin Panel</h1>
-        <p className="text-white/70 text-sm">SMM Xizmatlari boshqaruvi</p>
+  const StatCard = ({ icon, label, value, subValue, color }: any) => (
+    <div className={`bg-gradient-to-br ${color} rounded-2xl p-4 border border-white/10`}>
+      <div className="flex items-center justify-between">
+        <span className="text-2xl">{icon}</span>
+        {subValue && <span className="text-xs text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">+{subValue}</span>}
       </div>
+      <p className="text-2xl font-bold text-white mt-2">{formatNumber(value)}</p>
+      <p className="text-white/60 text-sm">{label}</p>
+    </div>
+  );
 
-      {/* Error */}
+  const Pagination = () => totalPages > 1 && (
+    <div className="flex items-center justify-center gap-2 mt-4">
+      <button
+        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+        disabled={currentPage === 1}
+        className="w-10 h-10 rounded-xl bg-white/5 text-white disabled:opacity-30 hover:bg-white/10 transition-all"
+      >
+        ←
+      </button>
+      <div className="px-4 py-2 rounded-xl bg-white/10 text-white text-sm">
+        {currentPage} / {totalPages}
+      </div>
+      <button
+        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+        disabled={currentPage === totalPages}
+        className="w-10 h-10 rounded-xl bg-white/5 text-white disabled:opacity-30 hover:bg-white/10 transition-all"
+      >
+        →
+      </button>
+    </div>
+  );
+
+  // ==================== RENDER ====================
+  return (
+    <div className="min-h-screen bg-[#0a0a0a]">
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed top-0 left-0 h-full w-72 bg-[#111111] border-r border-white/10 z-50 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Sidebar Header */}
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                <span className="text-lg">🔐</span>
+              </div>
+              <div>
+                <h2 className="font-bold text-white">Admin Panel</h2>
+                <p className="text-xs text-white/50">SMM Xizmatlari</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70 hover:bg-white/10"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Menu Items */}
+        <nav className="p-3 space-y-1">
+          {menuItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => handleTabChange(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeTab === item.id 
+                  ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white border border-purple-500/30' 
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span className="text-xl">{item.icon}</span>
+              <span className="flex-1 text-left font-medium">{item.label}</span>
+              {item.badge && item.badge > 0 && (
+                <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-purple-500 text-white">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-all"
+          >
+            <span>🏠</span>
+            <span>Asosiy sahifaga</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            {/* Hamburger Menu */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="w-10 h-10 rounded-xl bg-white/5 flex flex-col items-center justify-center gap-1.5 hover:bg-white/10 transition-all"
+            >
+              <span className="w-5 h-0.5 bg-white rounded-full"></span>
+              <span className="w-5 h-0.5 bg-white rounded-full"></span>
+              <span className="w-5 h-0.5 bg-white rounded-full"></span>
+            </button>
+            <div>
+              <h1 className="font-bold text-white">{menuItems.find(m => m.id === activeTab)?.label}</h1>
+              <p className="text-xs text-white/50">{menuItems.find(m => m.id === activeTab)?.icon} Boshqaruv</p>
+            </div>
+          </div>
+          
+          {/* Header Actions */}
+          <div className="flex items-center gap-2">
+            {dashboard?.payments.pending ? (
+              <div className="px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span className="text-amber-400 text-sm font-medium">{dashboard.payments.pending}</span>
+              </div>
+            ) : null}
+            <button 
+              onClick={() => { fetchDashboard(); if(activeTab !== 'dashboard') { activeTab === 'users' ? fetchUsers() : activeTab === 'orders' ? fetchOrders() : fetchPayments(); }}}
+              className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+            >
+              🔄
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Error Toast */}
       {error && (
-        <div className="m-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
-          {error}
-          <button onClick={() => setError(null)} className="ml-2 text-white">✕</button>
+        <div className="fixed top-20 left-4 right-4 z-50 bg-red-500/90 backdrop-blur text-white px-4 py-3 rounded-xl flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-white/80 hover:text-white">✕</button>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex overflow-x-auto p-2 gap-2 bg-[#1a1a1a] border-b border-white/10">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-              activeTab === tab.id
-                ? 'bg-purple-600 text-white'
-                : 'bg-white/5 text-white/60 hover:bg-white/10'
-            }`}
-          >
-            <span>{tab.icon}</span>
-            <span className="text-sm font-medium">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="p-4">
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && dashboard && (
-          <div className="space-y-4">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="bg-gradient-to-br from-blue-600/20 to-blue-600/5 border-blue-500/30">
-                <div className="p-4">
-                  <p className="text-blue-400 text-xs font-medium">👥 Foydalanuvchilar</p>
-                  <p className="text-2xl font-bold text-white mt-1">{formatNumber(dashboard.users.total)}</p>
-                  <p className="text-green-400 text-xs mt-1">+{dashboard.users.today} bugun</p>
-                </div>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-green-600/20 to-green-600/5 border-green-500/30">
-                <div className="p-4">
-                  <p className="text-green-400 text-xs font-medium">📦 Buyurtmalar</p>
-                  <p className="text-2xl font-bold text-white mt-1">{formatNumber(dashboard.orders.total)}</p>
-                  <p className="text-green-400 text-xs mt-1">+{dashboard.orders.today} bugun</p>
-                </div>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-yellow-600/20 to-yellow-600/5 border-yellow-500/30">
-                <div className="p-4">
-                  <p className="text-yellow-400 text-xs font-medium">💰 Umumiy daromad</p>
-                  <p className="text-2xl font-bold text-white mt-1">{formatNumber(dashboard.revenue.total)}</p>
-                  <p className="text-xs text-white/50">so'm</p>
-                </div>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-purple-600/20 to-purple-600/5 border-purple-500/30">
-                <div className="p-4">
-                  <p className="text-purple-400 text-xs font-medium">💳 Kutilayotgan</p>
-                  <p className="text-2xl font-bold text-white mt-1">{dashboard.payments.pending}</p>
-                  <p className="text-xs text-white/50">to'lov</p>
-                </div>
-              </Card>
-            </div>
-
-            {/* Order Stats */}
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-white mb-3">📊 Buyurtma holatlari</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-yellow-400 text-sm">⏳ Kutilmoqda</span>
-                    <span className="text-white font-medium">{dashboard.orders.pending}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-400 text-sm">🔄 Jarayonda</span>
-                    <span className="text-white font-medium">{dashboard.orders.processing}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-green-400 text-sm">✅ Bajarildi</span>
-                    <span className="text-white font-medium">{dashboard.orders.completed}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-red-400 text-sm">❌ Bekor qilingan</span>
-                    <span className="text-white font-medium">{dashboard.orders.canceled}</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Weekly Chart */}
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-white mb-3">📈 Oxirgi 7 kun</h3>
-                <div className="space-y-2">
-                  {dashboard.weekly_stats.slice(0, 7).reverse().map(day => (
-                    <div key={day.date} className="flex items-center gap-2">
-                      <span className="text-white/50 text-xs w-20">{day.date.slice(5)}</span>
-                      <div className="flex-1 bg-white/10 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-purple-500 h-full rounded-full"
-                          style={{ width: `${Math.min(100, (day.orders / Math.max(...dashboard.weekly_stats.map(d => d.orders || 1))) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-white text-xs w-8 text-right">{day.orders}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
+      {/* Main Content */}
+      <main className="p-4 pb-24">
+        {/* Loading */}
+        {loading && !dashboard && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+            <p className="text-white/50 mt-4">Yuklanmoqda...</p>
           </div>
         )}
 
-        {/* Users Tab */}
+        {/* Dashboard */}
+        {activeTab === 'dashboard' && dashboard && (
+          <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard icon="👥" label="Foydalanuvchilar" value={dashboard.users.total} subValue={dashboard.users.today} color="from-blue-600/20 to-blue-900/20" />
+              <StatCard icon="📦" label="Buyurtmalar" value={dashboard.orders.total} subValue={dashboard.orders.today} color="from-emerald-600/20 to-emerald-900/20" />
+              <StatCard icon="💰" label="Daromad" value={dashboard.revenue.total} subValue={null} color="from-amber-600/20 to-amber-900/20" />
+              <StatCard icon="💳" label="Kutilayotgan" value={dashboard.payments.pending} subValue={null} color="from-purple-600/20 to-purple-900/20" />
+            </div>
+
+            {/* Order Status */}
+            <div className="bg-[#111] rounded-2xl border border-white/10 p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <span>📊</span> Buyurtmalar holati
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'Kutilmoqda', value: dashboard.orders.pending, color: 'bg-amber-500', icon: '⏳' },
+                  { label: 'Jarayonda', value: dashboard.orders.processing, color: 'bg-blue-500', icon: '🔄' },
+                  { label: 'Bajarildi', value: dashboard.orders.completed, color: 'bg-emerald-500', icon: '✅' },
+                  { label: 'Bekor qilingan', value: dashboard.orders.canceled, color: 'bg-red-500', icon: '❌' },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-3">
+                    <span className="text-lg">{item.icon}</span>
+                    <div className="flex-1">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-white/70">{item.label}</span>
+                        <span className="text-white font-medium">{formatNumber(item.value)}</span>
+                      </div>
+                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${item.color} rounded-full transition-all`}
+                          style={{ width: `${Math.min(100, (item.value / Math.max(dashboard.orders.total, 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Weekly Chart */}
+            <div className="bg-[#111] rounded-2xl border border-white/10 p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <span>📈</span> Oxirgi 7 kun
+              </h3>
+              <div className="flex items-end gap-2 h-32">
+                {dashboard.weekly_stats.slice(0, 7).reverse().map((day, i) => {
+                  const maxOrders = Math.max(...dashboard.weekly_stats.map(d => d.orders || 1));
+                  const height = (day.orders / maxOrders) * 100;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                      <div className="w-full bg-white/5 rounded-lg overflow-hidden flex-1 flex items-end">
+                        <div 
+                          className="w-full bg-gradient-to-t from-purple-500 to-blue-500 rounded-lg transition-all"
+                          style={{ height: `${Math.max(height, 5)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-white/50">{day.date.slice(8)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Users */}
         {activeTab === 'users' && (
           <div className="space-y-4">
             {/* Search */}
-            <div className="flex gap-2">
-              <Input
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">🔍</span>
+              <input
+                type="text"
                 placeholder="ID, username yoki ism qidirish..."
                 value={searchQuery}
-                onChange={(value) => setSearchQuery(value)}
-                className="flex-1"
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full bg-[#111] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white placeholder:text-white/30 focus:border-purple-500/50 focus:outline-none"
               />
-              <Button onClick={fetchUsers} variant="primary" className="px-4">
-                🔍
-              </Button>
             </div>
 
             {/* Users List */}
-            {loading ? (
-              <Loading text="Yuklanmoqda..." />
-            ) : (
+            {!loading && (
               <div className="space-y-2">
                 {users.map(u => (
-                  <Card key={u.user_id} className="hover:border-purple-500/50 cursor-pointer" onClick={() => setSelectedUser(u)}>
-                    <div className="p-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-white">{u.full_name || 'Noma\'lum'}</p>
-                          <p className="text-white/50 text-xs">@{u.username || u.user_id}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-green-400 font-medium">{formatNumber(u.balance)} so'm</p>
-                          <p className="text-white/50 text-xs">{u.orders_count} buyurtma</p>
-                        </div>
+                  <div 
+                    key={u.user_id}
+                    onClick={() => setSelectedUser(u)}
+                    className="bg-[#111] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 cursor-pointer transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center text-lg">
+                        {u.full_name?.charAt(0) || '👤'}
                       </div>
-                      {u.is_blocked && (
-                        <span className="mt-2 inline-block px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">
-                          Bloklangan
-                        </span>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white truncate">{u.full_name || 'Noma\'lum'}</p>
+                        <p className="text-sm text-white/50">@{u.username || u.user_id}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-emerald-400">{formatNumber(u.balance)}</p>
+                        <p className="text-xs text-white/50">{u.orders_count} buyurtma</p>
+                      </div>
                     </div>
-                  </Card>
+                    {u.is_blocked && (
+                      <div className="mt-2 px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg inline-block">
+                        🚫 Bloklangan
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button
-                  disabled={userPage === 1}
-                  onClick={() => setUserPage(p => p - 1)}
-                  variant="secondary"
-                  size="sm"
-                >
-                  ◀️
-                </Button>
-                <span className="text-white px-4 py-2">{userPage} / {totalPages}</span>
-                <Button
-                  disabled={userPage === totalPages}
-                  onClick={() => setUserPage(p => p + 1)}
-                  variant="secondary"
-                  size="sm"
-                >
-                  ▶️
-                </Button>
-              </div>
-            )}
+            <Pagination />
           </div>
         )}
 
-        {/* User Detail Modal */}
-        {selectedUser && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white">{selectedUser.full_name}</h3>
-                    <p className="text-white/50 text-sm">@{selectedUser.username || selectedUser.user_id}</p>
-                  </div>
-                  <button onClick={() => setSelectedUser(null)} className="text-white/50 text-xl">✕</button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-white/70">ID:</span>
-                    <span className="text-white font-mono">{selectedUser.user_id}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-white/70">Balans:</span>
-                    <span className="text-green-400 font-medium">{formatNumber(selectedUser.balance)} so'm</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-white/70">Buyurtmalar:</span>
-                    <span className="text-white">{selectedUser.orders_count}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-white/70">Sarfladi:</span>
-                    <span className="text-white">{formatNumber(selectedUser.total_spent)} so'm</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-white/70">Ro'yxatdan:</span>
-                    <span className="text-white text-sm">{formatDate(selectedUser.created_at)}</span>
-                  </div>
-                </div>
-
-                {/* Balance change */}
-                <div className="mt-4 pt-4 border-t border-white/10">
-                  <p className="text-white/70 text-sm mb-2">Balansni o'zgartirish:</p>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Summa (+/-)"
-                      value={balanceChange}
-                      onChange={(value) => setBalanceChange(value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      onClick={() => handleBalanceChange(selectedUser.user_id, parseInt(balanceChange))}
-                      variant="primary"
-                      disabled={!balanceChange}
-                    >
-                      ✓
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* Orders Tab */}
+        {/* Orders */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
-            {/* Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {['', 'pending', 'processing', 'completed', 'canceled'].map(status => (
+            {/* Status Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+              {[
+                { value: '', label: 'Barchasi' },
+                { value: 'pending', label: '⏳ Kutilmoqda' },
+                { value: 'processing', label: '🔄 Jarayonda' },
+                { value: 'completed', label: '✅ Bajarildi' },
+                { value: 'canceled', label: '❌ Bekor' },
+              ].map(f => (
                 <button
-                  key={status}
-                  onClick={() => { setOrderStatus(status); setOrderPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
-                    orderStatus === status
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white/10 text-white/70'
+                  key={f.value}
+                  onClick={() => { setStatusFilter(f.value); setCurrentPage(1); }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                    statusFilter === f.value
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-[#111] text-white/70 hover:text-white border border-white/10'
                   }`}
                 >
-                  {status === '' ? 'Barchasi' : status === 'pending' ? 'Kutilmoqda' : status === 'processing' ? 'Jarayonda' : status === 'completed' ? 'Bajarildi' : 'Bekor'}
+                  {f.label}
                 </button>
               ))}
             </div>
 
             {/* Orders List */}
-            {loading ? (
-              <Loading text="Yuklanmoqda..." />
-            ) : (
+            {!loading && (
               <div className="space-y-2">
                 {orders.map(order => (
-                  <Card key={order.id}>
-                    <div className="p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-medium text-white">#{order.id}</p>
-                          <p className="text-white/50 text-xs">{order.full_name || order.username}</p>
-                        </div>
-                        <StatusBadge status={order.status} />
+                  <div key={order.id} className="bg-[#111] border border-white/10 rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <span className="text-white font-mono text-sm">#{order.id}</span>
+                        <span className="text-white/30 mx-2">•</span>
+                        <span className="text-white/50 text-sm">{order.full_name || order.username}</span>
                       </div>
-                      <p className="text-white/70 text-sm truncate">{order.service}</p>
-                      <div className="flex justify-between mt-2 text-sm">
-                        <span className="text-white/50">{formatNumber(order.quantity)} dona</span>
-                        <span className="text-green-400">{formatNumber(order.price)} so'm</span>
-                      </div>
-                      <p className="text-white/30 text-xs mt-1">{formatDate(order.created_at)}</p>
+                      <StatusBadge status={order.status} />
                     </div>
-                  </Card>
+                    <p className="text-white/80 text-sm truncate mb-2">{order.service}</p>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-white/50">{formatNumber(order.quantity)} dona</span>
+                      <span className="text-emerald-400 font-medium">{formatNumber(order.price)} so'm</span>
+                    </div>
+                    <p className="text-white/30 text-xs mt-2">{formatDate(order.created_at)}</p>
+                  </div>
                 ))}
               </div>
             )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button disabled={orderPage === 1} onClick={() => setOrderPage(p => p - 1)} variant="secondary" size="sm">◀️</Button>
-                <span className="text-white px-4 py-2">{orderPage} / {totalPages}</span>
-                <Button disabled={orderPage === totalPages} onClick={() => setOrderPage(p => p + 1)} variant="secondary" size="sm">▶️</Button>
-              </div>
-            )}
+            <Pagination />
           </div>
         )}
 
-        {/* Payments Tab */}
+        {/* Payments */}
         {activeTab === 'payments' && (
           <div className="space-y-4">
-            {/* Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {['', 'pending', 'approved', 'rejected'].map(status => (
+            {/* Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+              {[
+                { value: '', label: 'Barchasi' },
+                { value: 'pending', label: '⏳ Kutilmoqda' },
+                { value: 'approved', label: '✅ Tasdiqlangan' },
+                { value: 'rejected', label: '❌ Rad etilgan' },
+              ].map(f => (
                 <button
-                  key={status}
-                  onClick={() => { setPaymentStatus(status); setPaymentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
-                    paymentStatus === status
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white/10 text-white/70'
+                  key={f.value}
+                  onClick={() => { setStatusFilter(f.value); setCurrentPage(1); }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                    statusFilter === f.value
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-[#111] text-white/70 hover:text-white border border-white/10'
                   }`}
                 >
-                  {status === '' ? 'Barchasi' : status === 'pending' ? 'Kutilmoqda' : status === 'approved' ? 'Tasdiqlangan' : 'Rad etilgan'}
+                  {f.label}
                 </button>
               ))}
             </div>
 
             {/* Payments List */}
-            {loading ? (
-              <Loading text="Yuklanmoqda..." />
-            ) : (
+            {!loading && (
               <div className="space-y-2">
                 {payments.map(payment => (
-                  <Card key={payment.id}>
-                    <div className="p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-medium text-white">{payment.full_name || payment.username}</p>
-                          <p className="text-white/50 text-xs">{payment.method}</p>
-                        </div>
-                        <StatusBadge status={payment.status} />
+                  <div key={payment.id} className="bg-[#111] border border-white/10 rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-medium text-white">{payment.full_name || payment.username}</p>
+                        <p className="text-sm text-white/50">{payment.method}</p>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-green-400 font-medium text-lg">{formatNumber(payment.amount)} so'm</span>
-                        <span className="text-white/30 text-xs">{formatDate(payment.created_at)}</span>
-                      </div>
-                      
-                      {/* Action buttons for pending */}
-                      {payment.status === 'pending' && (
-                        <div className="flex gap-2 mt-3">
-                          <Button
-                            onClick={() => handleApprovePayment(payment.id)}
-                            variant="primary"
-                            size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                          >
-                            ✅ Tasdiqlash
-                          </Button>
-                          <Button
-                            onClick={() => handleRejectPayment(payment.id)}
-                            variant="danger"
-                            size="sm"
-                            className="flex-1"
-                          >
-                            ❌ Rad etish
-                          </Button>
-                        </div>
-                      )}
+                      <StatusBadge status={payment.status} />
                     </div>
-                  </Card>
+                    
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-2xl font-bold text-emerald-400">{formatNumber(payment.amount)}</span>
+                      <span className="text-white/30 text-sm">{formatDate(payment.created_at)}</span>
+                    </div>
+
+                    {payment.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprovePayment(payment.id)}
+                          className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-all"
+                        >
+                          ✅ Tasdiqlash
+                        </button>
+                        <button
+                          onClick={() => handleRejectPayment(payment.id)}
+                          className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-400 font-medium border border-red-500/30 hover:bg-red-500/30 transition-all"
+                        >
+                          ❌ Rad etish
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button disabled={paymentPage === 1} onClick={() => setPaymentPage(p => p - 1)} variant="secondary" size="sm">◀️</Button>
-                <span className="text-white px-4 py-2">{paymentPage} / {totalPages}</span>
-                <Button disabled={paymentPage === totalPages} onClick={() => setPaymentPage(p => p + 1)} variant="secondary" size="sm">▶️</Button>
-              </div>
-            )}
+            <Pagination />
           </div>
         )}
 
-        {/* Settings Tab */}
+        {/* Settings */}
         {activeTab === 'settings' && (
           <div className="space-y-4">
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-white mb-4">⚙️ Tizim sozlamalari</h3>
-                <p className="text-white/50 text-sm">
-                  Sozlamalar botda boshqariladi. Telegram botda /admin buyrug'ini ishlating.
-                </p>
-              </div>
-            </Card>
+            <div className="bg-[#111] border border-white/10 rounded-xl p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <span>⚙️</span> Tizim sozlamalari
+              </h3>
+              <p className="text-white/50 text-sm">
+                Sozlamalar Telegram botda boshqariladi.<br/>
+                Bot ichida <code className="bg-white/10 px-2 py-0.5 rounded">/admin</code> buyrug'ini yuboring.
+              </p>
+            </div>
 
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-white mb-4">📊 API holati</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-white/70">Peakerr SMM</span>
-                    <span className="text-green-400">✅ Ishlayapti</span>
+            <div className="bg-[#111] border border-white/10 rounded-xl p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <span>📡</span> API holati
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { name: 'Peakerr SMM', status: true },
+                  { name: 'SMMMain', status: true },
+                  { name: 'VAK-SMS', status: true },
+                  { name: '5SIM', status: false },
+                  { name: 'SMSPVA', status: true },
+                  { name: 'Click', status: false },
+                ].map(api => (
+                  <div key={api.name} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <span className="text-white/70">{api.name}</span>
+                    <span className={api.status ? 'text-emerald-400' : 'text-amber-400'}>
+                      {api.status ? '✅ Ishlayapti' : '⚠️ Sozlanmagan'}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-white/70">SMMMain</span>
-                    <span className="text-green-400">✅ Ishlayapti</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-white/70">VAK-SMS</span>
-                    <span className="text-green-400">✅ Ishlayapti</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-white/70">Click</span>
-                    <span className="text-yellow-400">⚠️ Sozlanmagan</span>
-                  </div>
-                </div>
+                ))}
               </div>
-            </Card>
+            </div>
           </div>
         )}
-      </div>
+      </main>
+
+      {/* User Detail Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center">
+          <div className="w-full max-w-lg bg-[#111] rounded-t-3xl border-t border-white/10 max-h-[85vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-[#111] p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="font-bold text-white text-lg">Foydalanuvchi ma'lumotlari</h3>
+              <button 
+                onClick={() => { setSelectedUser(null); setBalanceAmount(''); }}
+                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 space-y-4">
+              {/* User Info */}
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-2xl">
+                  {selectedUser.full_name?.charAt(0) || '👤'}
+                </div>
+                <div>
+                  <p className="font-bold text-white text-lg">{selectedUser.full_name || 'Noma\'lum'}</p>
+                  <p className="text-white/50">@{selectedUser.username || selectedUser.user_id}</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white/5 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold text-emerald-400">{formatNumber(selectedUser.balance)}</p>
+                  <p className="text-white/50 text-sm">Balans</p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold text-white">{selectedUser.orders_count}</p>
+                  <p className="text-white/50 text-sm">Buyurtmalar</p>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="bg-white/5 rounded-xl divide-y divide-white/5">
+                <div className="flex justify-between p-3">
+                  <span className="text-white/50">ID</span>
+                  <span className="text-white font-mono">{selectedUser.user_id}</span>
+                </div>
+                <div className="flex justify-between p-3">
+                  <span className="text-white/50">Telefon</span>
+                  <span className="text-white">{selectedUser.phone_number || '-'}</span>
+                </div>
+                <div className="flex justify-between p-3">
+                  <span className="text-white/50">Sarfladi</span>
+                  <span className="text-white">{formatNumber(selectedUser.total_spent)} so'm</span>
+                </div>
+                <div className="flex justify-between p-3">
+                  <span className="text-white/50">Ro'yxatdan</span>
+                  <span className="text-white">{formatDate(selectedUser.created_at)}</span>
+                </div>
+              </div>
+
+              {/* Balance Change */}
+              <div className="bg-white/5 rounded-xl p-4">
+                <p className="text-white font-medium mb-3">💰 Balansni o'zgartirish</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={balanceAmount}
+                    onChange={(e) => setBalanceAmount(e.target.value)}
+                    placeholder="Summa (+/-)"
+                    className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-purple-500/50 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleBalanceChange}
+                    disabled={!balanceAmount}
+                    className="px-6 py-3 rounded-xl bg-purple-500 text-white font-medium disabled:opacity-30 hover:bg-purple-600 transition-all"
+                  >
+                    ✓
+                  </button>
+                </div>
+                <p className="text-white/30 text-xs mt-2">
+                  Qo'shish uchun musbat, ayirish uchun manfiy son kiriting
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
