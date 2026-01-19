@@ -2,15 +2,22 @@
 """
 Foydalanuvchi endpointlari
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, List
+from fastapi import APIRouter, Depends, HTTPException, Body
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_optional
 from ..database import Database
 from ..models import UserResponse, BalanceResponse, ReferralStatsResponse
 from ..config import BOT_TOKEN
 
 router = APIRouter(prefix="/user", tags=["user"])
+
+
+class CreateUserRequest(BaseModel):
+    user_id: int
+    username: Optional[str] = None
+    full_name: str
 
 
 @router.get("/me", response_model=UserResponse)
@@ -40,6 +47,82 @@ async def get_balance(user: Dict[str, Any] = Depends(get_current_user)):
         balance=balance,
         formatted=f"{balance:,.0f} so'm"
     )
+
+
+@router.get("/{user_id}")
+async def get_user_by_id(user_id: int) -> Dict[str, Any]:
+    """
+    User ID bo'yicha foydalanuvchi ma'lumotlarini olish
+    Mini App uchun - balans yangilash va foydalanuvchi tekshirish
+    """
+    user = Database.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    return {
+        "success": True,
+        "user": {
+            "user_id": user["user_id"],
+            "username": user.get("username"),
+            "full_name": user.get("full_name"),
+            "balance": user.get("balance", 0),
+            "referral_count": user.get("referral_count", 0),
+            "referral_earnings": user.get("referral_earnings", 0),
+            "is_banned": bool(user.get("is_banned", 0)),
+            "created_at": user.get("created_at")
+        }
+    }
+
+
+@router.post("/create")
+async def create_or_get_user(request: CreateUserRequest) -> Dict[str, Any]:
+    """
+    Foydalanuvchi yaratish yoki mavjud bo'lsa olish
+    """
+    # Avval mavjud foydalanuvchini tekshirish
+    existing_user = Database.get_user(request.user_id)
+    if existing_user:
+        return {
+            "success": True,
+            "user": {
+                "user_id": existing_user["user_id"],
+                "username": existing_user.get("username"),
+                "full_name": existing_user.get("full_name"),
+                "balance": existing_user.get("balance", 0),
+                "referral_count": existing_user.get("referral_count", 0),
+                "referral_earnings": existing_user.get("referral_earnings", 0),
+                "is_banned": bool(existing_user.get("is_banned", 0)),
+                "created_at": existing_user.get("created_at")
+            },
+            "created": False
+        }
+    
+    # Yangi foydalanuvchi yaratish
+    Database.add_user(
+        user_id=request.user_id,
+        username=request.username or "",
+        full_name=request.full_name
+    )
+    
+    # Yaratilgan foydalanuvchini olish
+    new_user = Database.get_user(request.user_id)
+    if not new_user:
+        raise HTTPException(status_code=500, detail="Foydalanuvchi yaratishda xatolik")
+    
+    return {
+        "success": True,
+        "user": {
+            "user_id": new_user["user_id"],
+            "username": new_user.get("username"),
+            "full_name": new_user.get("full_name"),
+            "balance": new_user.get("balance", 0),
+            "referral_count": new_user.get("referral_count", 0),
+            "referral_earnings": new_user.get("referral_earnings", 0),
+            "is_banned": bool(new_user.get("is_banned", 0)),
+            "created_at": new_user.get("created_at")
+        },
+        "created": True
+    }
 
 
 @router.get("/referral", response_model=ReferralStatsResponse)

@@ -21,7 +21,7 @@ interface PremiumStatus {
 }
 
 export default function Premium() {
-  const { hapticFeedback, showAlert, tg } = useTelegram()
+  const { hapticFeedback, showAlert } = useTelegram()
   const { user } = useAuth()
   const [plans, setPlans] = useState<PremiumPlan[]>([
     { months: 1, price: 45000, original_price: 55000, discount_percent: 18, popular: false, best_value: false },

@@ -18,7 +18,7 @@ interface PaymentMethod {
 
 export default function Deposit() {
   const navigate = useNavigate()
-  const { hapticFeedback, showAlert, tg } = useTelegram()
+  const { hapticFeedback, showAlert } = useTelegram()
   const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   

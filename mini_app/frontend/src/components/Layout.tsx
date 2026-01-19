@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from './BottomNav'
 import { useTelegram } from '../hooks/useTelegram'
 import { useAuthStore } from '../store'
-import { authAPI, settingsAPI } from '../lib/api'
+import { authAPI } from '../lib/api'
 
 interface LayoutProps {
   children: ReactNode
@@ -13,7 +13,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { tg, initData, backButton, isInTelegram } = useTelegram()
+  const { initData, backButton } = useTelegram()
   const { isAuthenticated, setAuth } = useAuthStore()
 
   // Authenticate on mount
@@ -22,15 +22,17 @@ export default function Layout({ children }: LayoutProps) {
       if (initData && !isAuthenticated) {
         try {
           const response = await authAPI.authenticate(initData)
-          setAuth(response.access_token, {
-            user_id: response.user.user_id,
-            username: response.user.username,
-            full_name: response.user.full_name,
-            balance: response.user.balance,
-            referral_count: 0,
-            referral_earnings: 0,
-            is_banned: false
-          })
+          if (response.success && response.user) {
+            setAuth('telegram-session', {
+              user_id: response.user.user_id,
+              username: response.user.username || '',
+              full_name: response.user.full_name || '',
+              balance: response.user.balance || 0,
+              referral_count: response.user.referral_count || 0,
+              referral_earnings: response.user.referral_earnings || 0,
+              is_banned: response.user.is_banned || false
+            })
+          }
         } catch (error) {
           console.error('Auth error:', error)
         }
