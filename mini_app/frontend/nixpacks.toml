@@ -12,7 +12,3 @@ cmds = ["npm run build"]
 
 [start]
 cmd = "node server.js"
-
-# Caddy ni o'chirish
-[staticAssets]
-enabled = false
