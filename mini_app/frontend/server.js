@@ -141,6 +141,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Healthcheck endpoint for Railway (root path)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // Get user by ID - from Bot API (main database)
 app.get('/api/user/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
@@ -676,10 +681,19 @@ app.get('*', (req, res) => {
 
 // Initialize database and start server
 initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  // Railway uchun 0.0.0.0 ga bind qilish kerak
+  const HOST = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
     console.log('BOT_TOKEN:', BOT_TOKEN ? 'Set (' + BOT_TOKEN.substring(0, 10) + '...)' : 'NOT SET');
     console.log('ADMIN_ID:', ADMIN_ID || 'NOT SET');
     console.log('BOT_API_URL:', BOT_API_URL || 'NOT SET');
+  });
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+  // Database xatosi bo'lsa ham serverni ishga tushirish
+  const HOST = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT} (without database)`);
   });
 });
