@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
+const HOST = '0.0.0.0';
 
 // Bot config for sending receipts
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -20,10 +21,26 @@ const BOT_API_URL = process.env.BOT_API_URL || 'http://smmxizmatlari.railway.int
 // JSON parsing
 app.use(express.json());
 
+// MUHIM: Health endpoint ENG BIRINCHI bo'lishi kerak!
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'SMM Mini App' });
+});
+
+// Server avval ishga tushsin
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
+  console.log('BOT_TOKEN:', BOT_TOKEN ? 'Set' : 'NOT SET');
+  console.log('ADMIN_ID:', ADMIN_ID || 'NOT SET');
+  console.log('BOT_API_URL:', BOT_API_URL);
+});
+
 // Database - SQLite with sql.js
 // MUHIM: Production'da DATABASE_PATH env variable orqali asosiy bot bazasiga yo'l berilishi kerak!
-// Default: root papkadagi smm_bot.db (development uchun)
-const DATABASE_PATH = process.env.DATABASE_PATH || join(__dirname, '../..', 'smm_bot.db');
+const DATABASE_PATH = process.env.DATABASE_PATH || '/smm_bot.db';
 console.log('Using database at:', DATABASE_PATH);
 let db = null;
 
@@ -679,21 +696,9 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
-// Initialize database and start server
+// Initialize database in background (server already running)
 initDb().then(() => {
-  // Railway uchun 0.0.0.0 ga bind qilish kerak
-  const HOST = process.env.HOST || '0.0.0.0';
-  app.listen(PORT, HOST, () => {
-    console.log(`Server running on http://${HOST}:${PORT}`);
-    console.log('BOT_TOKEN:', BOT_TOKEN ? 'Set (' + BOT_TOKEN.substring(0, 10) + '...)' : 'NOT SET');
-    console.log('ADMIN_ID:', ADMIN_ID || 'NOT SET');
-    console.log('BOT_API_URL:', BOT_API_URL || 'NOT SET');
-  });
+  console.log('Database initialized successfully');
 }).catch(err => {
   console.error('Failed to initialize database:', err);
-  // Database xatosi bo'lsa ham serverni ishga tushirish
-  const HOST = process.env.HOST || '0.0.0.0';
-  app.listen(PORT, HOST, () => {
-    console.log(`Server running on http://${HOST}:${PORT} (without database)`);
-  });
 });
