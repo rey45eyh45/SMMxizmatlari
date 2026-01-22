@@ -153,7 +153,7 @@ app.get('/api/user/:userId', async (req, res) => {
     console.log('Fetching from:', url);
     
     const botResponse = await axios.get(url, {
-      timeout: 5000
+      timeout: 10000  // 10 sekund timeout
     });
     
     console.log('Bot API response:', botResponse.status, botResponse.data);
@@ -164,15 +164,24 @@ app.get('/api/user/:userId', async (req, res) => {
     }
   } catch (err) {
     console.log('Bot API error:', err.response?.status, err.response?.data || err.message);
+    
+    // MUHIM: Agar Bot API ishlamasa, xatolik qaytarish
+    // Local bazadan foydalanish mumkin emas chunki balans noto'g'ri bo'ladi!
+    console.error('ERROR: Bot API not reachable! Please check BOT_API_URL configuration.');
+    console.error('Current BOT_API_URL:', BOT_API_URL);
+    console.error('Tip: Set BOT_API_URL to public URL like https://your-bot.railway.app');
   }
   
+  // Fallback to local database - FAQAT user mavjudligini tekshirish uchun
+  // OGOHLANTIRISH: Balans noto'g'ri bo'lishi mumkin!
   console.log('Falling back to local database - NOTE: Balance may be out of sync!');
   
-  // Fallback to local database
-  // MUHIM: Local baza Bot bazasi bilan sinxron emas!
-  // Foydalanuvchi borligini tekshirish uchun foydalaniladi
   if (!db) {
-    return res.status(500).json({ success: false, error: 'Database not available' });
+    return res.status(503).json({ 
+      success: false, 
+      error: 'Bot API ga ulanib bo\'lmadi. Iltimos, keyinroq urinib ko\'ring.',
+      hint: 'BOT_API_URL sozlamalarini tekshiring'
+    });
   }
   
   try {
@@ -183,8 +192,8 @@ app.get('/api/user/:userId', async (req, res) => {
     }
     
     const user = rowToUser(result[0].values[0]);
-    // OGOHLANTIRISH: Local baza - balans to'g'ri bo'lmasligi mumkin
-    console.warn('WARNING: Returning user from local database, balance may be outdated');
+    // OGOHLANTIRISH: Local baza - balans noto'g'ri!
+    console.warn('WARNING: Returning user from local database, balance is OUTDATED!');
     
     res.json({
       success: true,
@@ -192,12 +201,14 @@ app.get('/api/user/:userId', async (req, res) => {
         user_id: user.user_id,
         username: user.username,
         full_name: user.full_name,
-        balance: user.balance || 0,
+        balance: user.balance || 0,  // Bu balans noto'g'ri bo'lishi mumkin!
         referral_count: user.referral_count || 0,
         referral_earnings: user.referral_earnings || 0,
         is_banned: !!user.is_banned,
         created_at: user.created_at || ''
-      }
+      },
+      warning: 'Balans ma\'lumoti eskirgan bo\'lishi mumkin. Bot API ga ulanib bo\'lmadi.'
+    });
     });
   } catch (err) {
     console.error('Error getting user:', err);
