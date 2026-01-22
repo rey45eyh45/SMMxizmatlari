@@ -21,7 +21,10 @@ const BOT_API_URL = process.env.BOT_API_URL || 'http://smmxizmatlari.railway.int
 app.use(express.json());
 
 // Database - SQLite with sql.js
-const DATABASE_PATH = process.env.DATABASE_PATH || './smm_bot.db';
+// MUHIM: Production'da DATABASE_PATH env variable orqali asosiy bot bazasiga yo'l berilishi kerak!
+// Default: root papkadagi smm_bot.db (development uchun)
+const DATABASE_PATH = process.env.DATABASE_PATH || join(__dirname, '../..', 'smm_bot.db');
+console.log('Using database at:', DATABASE_PATH);
 let db = null;
 
 // Initialize database
@@ -163,9 +166,11 @@ app.get('/api/user/:userId', async (req, res) => {
     console.log('Bot API error:', err.response?.status, err.response?.data || err.message);
   }
   
-  console.log('Falling back to local database');
+  console.log('Falling back to local database - NOTE: Balance may be out of sync!');
   
   // Fallback to local database
+  // MUHIM: Local baza Bot bazasi bilan sinxron emas!
+  // Foydalanuvchi borligini tekshirish uchun foydalaniladi
   if (!db) {
     return res.status(500).json({ success: false, error: 'Database not available' });
   }
@@ -178,6 +183,8 @@ app.get('/api/user/:userId', async (req, res) => {
     }
     
     const user = rowToUser(result[0].values[0]);
+    // OGOHLANTIRISH: Local baza - balans to'g'ri bo'lmasligi mumkin
+    console.warn('WARNING: Returning user from local database, balance may be outdated');
     
     res.json({
       success: true,
@@ -468,15 +475,11 @@ app.get('/api/payment/methods', (req, res) => {
   res.json({ success: true, methods });
 });
 
-// Create payment request
-app.post('/api/payment/create', (req, res) => {
+// Create payment request - Bot API orqali yaratish
+app.post('/api/payment/create', async (req, res) => {
   const { user_id, amount, method } = req.body;
   
-  console.log('Creating payment:', { user_id, amount, method });
-  
-  if (!db) {
-    return res.status(500).json({ success: false, error: 'Database not available' });
-  }
+  console.log('Creating payment via Bot API:', { user_id, amount, method });
   
   if (!user_id || !amount || !method) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -484,6 +487,27 @@ app.post('/api/payment/create', (req, res) => {
   
   if (amount < 5000) {
     return res.status(400).json({ success: false, error: 'Minimum amount is 5000' });
+  }
+  
+  try {
+    // Avval Bot API orqali to'lov yaratishga urinish
+    const botResponse = await axios.post(`${BOT_API_URL}/api/payment/create`, {
+      user_id,
+      amount,
+      method
+    }, { timeout: 5000 });
+    
+    if (botResponse.data.success) {
+      console.log('Payment created via Bot API:', botResponse.data);
+      return res.json(botResponse.data);
+    }
+  } catch (err) {
+    console.log('Bot API payment create failed, using local fallback:', err.message);
+  }
+  
+  // Fallback: local bazaga yozish (faqat chek yuborish uchun)
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Database not available' });
   }
   
   try {
@@ -503,7 +527,7 @@ app.post('/api/payment/create', (req, res) => {
       paymentId = result[0].values[0][0];
     }
     
-    console.log('Payment created with ID:', paymentId);
+    console.log('Payment created locally with ID:', paymentId);
     
     res.json({ 
       success: true, 

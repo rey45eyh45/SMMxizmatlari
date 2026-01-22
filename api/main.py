@@ -19,7 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database import (
     get_user, add_user, update_balance, get_user_orders,
-    get_setting, get_user_payments_admin, get_user_by_phone
+    get_setting, get_user_payments_admin, get_user_by_phone,
+    add_payment
 )
 from config import BOT_TOKEN
 
@@ -303,6 +304,38 @@ async def get_balance(user_data: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="User not found")
     
     return {"balance": user[3]}
+
+
+# ==================== TO'LOVLAR ====================
+
+class PaymentCreateRequest(BaseModel):
+    user_id: int
+    amount: float
+    method: str
+
+
+@app.post("/api/payment/create")
+async def create_payment(request: PaymentCreateRequest):
+    """Mini App uchun to'lov yaratish - asosiy bot bazasiga yoziladi"""
+    if request.amount < 5000:
+        raise HTTPException(status_code=400, detail="Minimum to'lov 5000 so'm")
+    
+    # User mavjudligini tekshirish
+    user = get_user(request.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    # To'lov yaratish
+    payment_id = add_payment(request.user_id, request.amount, request.method)
+    
+    if not payment_id:
+        raise HTTPException(status_code=500, detail="To'lov yaratishda xatolik")
+    
+    return {
+        "success": True,
+        "payment_id": payment_id,
+        "message": "To'lov yaratildi"
+    }
 
 
 @app.get("/api/orders")

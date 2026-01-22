@@ -20,6 +20,17 @@ def get_db():
         conn.close()
 
 
+def get_db_connection():
+    """
+    Database connection olish (admin.py uchun)
+    MUHIM: Bu funksiya connection qaytaradi, 
+    foydalanish tugaganda conn.close() chaqiring!
+    """
+    conn = sqlite3.connect(DATABASE_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 class Database:
     """Database operatsiyalari"""
     
@@ -405,8 +416,8 @@ class Database:
             cursor.execute("SELECT COALESCE(SUM(price), 0) FROM orders WHERE status = 'completed' AND created_at LIKE ?", (f"{today}%",))
             today_revenue = cursor.fetchone()[0]
             
-            # To'lovlar
-            cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'kutilmoqda'")
+            # To'lovlar - 'pending' status ishlatiladi
+            cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
             pending_payments = cursor.fetchone()[0]
             
             return {
