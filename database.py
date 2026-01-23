@@ -363,8 +363,8 @@ def update_balance(user_id, amount):
             # Agar foydalanuvchi mavjud bo'lmasa - yaratish
             if result is None:
                 cursor.execute('''
-                    INSERT INTO users (user_id, balance, is_premium, created_at)
-                    VALUES (?, ?, 0, datetime('now'))
+                    INSERT INTO users (user_id, balance, created_at)
+                    VALUES (?, ?, datetime('now'))
                 ''', (user_id, max(0, amount)))
                 logger.info(f"Created new user {user_id} with balance {amount}")
                 return True
