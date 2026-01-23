@@ -452,10 +452,31 @@ app.post('/api/auth', async (req, res) => {
   }
 });
 
-// Get user payments
-app.get('/api/payments/:userId', (req, res) => {
+// Get user payments - from Bot API
+app.get('/api/payments/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
   
+  console.log('Getting payments for user:', userId);
+  
+  // Bot API'dan to'lovlarni olish
+  try {
+    const url = `${BOT_API_URL}/api/user/${userId}/payments`;
+    console.log('Fetching payments from:', url);
+    
+    const botResponse = await axios.get(url, {
+      timeout: 10000,
+      params: { _t: Date.now() }
+    });
+    
+    if (botResponse.data.success) {
+      console.log('Got payments from Bot API:', botResponse.data.payments?.length || 0);
+      return res.json(botResponse.data);
+    }
+  } catch (err) {
+    console.log('Bot API payments error:', err.message);
+  }
+  
+  // Fallback to local database
   if (!db) {
     return res.status(500).json({ success: false, error: 'Database not available' });
   }

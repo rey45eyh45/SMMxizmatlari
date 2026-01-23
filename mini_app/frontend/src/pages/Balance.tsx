@@ -42,9 +42,11 @@ export default function Balance() {
       
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/user/${user.user_id}/payments`)
+        const response = await fetch(`/api/payments/${user.user_id}`)
         const data = await response.json()
-        if (Array.isArray(data)) {
+        if (data.success && Array.isArray(data.payments)) {
+          setPayments(data.payments)
+        } else if (Array.isArray(data)) {
           setPayments(data)
         }
       } catch (error) {

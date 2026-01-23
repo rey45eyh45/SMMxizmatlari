@@ -384,6 +384,27 @@ async def get_payments(user_data: dict = Depends(get_current_user)):
     }
 
 
+@app.get("/api/user/{user_id}/payments")
+async def get_user_payments_by_id(user_id: int):
+    """User ID bo'yicha to'lovlar tarixi"""
+    payments = get_user_payments_admin(user_id)
+    
+    return {
+        "success": True,
+        "payments": [
+            {
+                "id": p[0],
+                "user_id": p[1],
+                "amount": p[2],
+                "method": p[3],
+                "status": p[4],
+                "created_at": p[5] if len(p) > 5 else ""
+            }
+            for p in payments
+        ]
+    }
+
+
 @app.get("/api/referral/stats")
 async def get_referral_stats(user_data: dict = Depends(get_current_user)):
     """Referal statistikasi"""
