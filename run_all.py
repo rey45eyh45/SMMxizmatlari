@@ -44,8 +44,8 @@ def run_bot_polling():
         
         logger.info("🤖 Bot polling boshlanmoqda...")
         
-        # Router'ni ulash
-        dp.include_router(router)
+        # Router allaqachon main.py da ulangan, qayta ulamaslik kerak!
+        # dp.include_router(router)  # BU KERAK EMAS!
         
         # Polling boshlash
         asyncio.run(dp.start_polling(bot))
