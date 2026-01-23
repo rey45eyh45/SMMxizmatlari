@@ -60,15 +60,24 @@ def main():
         # Railway - API asosiy, Bot background
         logger.info(f"✅ Railway mode - API port {port}")
         
-        # Bot'ni alohida thread'da ishga tushirish
+        # Bot'ni alohida thread'da ishga tushirish (xavfsiz)
         def run_bot_thread():
-            asyncio.run(run_bot())
+            try:
+                asyncio.run(run_bot())
+            except Exception as e:
+                logger.error(f"❌ Bot thread xatosi: {e}")
+                # Bot crash bo'lsa ham API ishlashda davom etsin
         
         bot_thread = threading.Thread(target=run_bot_thread, daemon=True)
         bot_thread.start()
         logger.info("✅ Bot thread ishga tushdi")
         
+        # Biroz kutish - bot import qilsin
+        import time
+        time.sleep(2)
+        
         # API ni asosiy thread'da ishga tushirish (Railway healthcheck uchun)
+        logger.info("✅ API server ishga tushmoqda...")
         run_api()
     else:
         # Local development - ikkalasi ham ishlaydi
