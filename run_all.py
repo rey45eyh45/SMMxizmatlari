@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import threading
+import time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,10 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 def run_api():
-    """FastAPI serverni alohida thread'da ishga tushirish"""
+    """FastAPI serverni ishga tushirish"""
     import uvicorn
     
     port = int(os.getenv("PORT", "8000"))
+    logger.info(f"🌐 API server port {port} da ishga tushmoqda...")
     
     config = uvicorn.Config(
         "api.main:app",
@@ -33,67 +35,61 @@ def run_api():
     server.run()
 
 
-async def run_bot():
-    """Telegram bot'ni ishga tushirish"""
-    # Bot modulini import qilish
-    from main import bot, dp, router
-    
-    logger.info("🤖 Bot ishga tushmoqda...")
-    
-    # Router'ni ulash
-    dp.include_router(router)
-    
-    # Polling boshlash
-    await dp.start_polling(bot)
+def run_bot_polling():
+    """Telegram bot'ni polling rejimida ishga tushirish"""
+    try:
+        # Bot modulini FAQAT shu yerda import qilish
+        logger.info("🤖 Bot moduli import qilinmoqda...")
+        from main import bot, dp, router
+        
+        logger.info("🤖 Bot polling boshlanmoqda...")
+        
+        # Router'ni ulash
+        dp.include_router(router)
+        
+        # Polling boshlash
+        asyncio.run(dp.start_polling(bot))
+    except Exception as e:
+        logger.error(f"❌ Bot xatosi: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def main():
-    """Asosiy funksiya - bot va API ni birga ishga tushirish"""
+    """Asosiy funksiya - API va bot ni birga ishga tushirish"""
     logger.info("🚀 SMM Bot + API ishga tushmoqda...")
     
-    # Railway uchun: $PORT orqali API ishga tushadi
-    # Bot alohida thread'da polling qiladi
-    
     port = os.getenv("PORT")
+    logger.info(f"📌 PORT env: {port}")
     
     if port:
-        # Railway - API asosiy, Bot background
-        logger.info(f"✅ Railway mode - API port {port}")
+        # Railway rejimi
+        logger.info(f"✅ Railway mode - PORT={port}")
         
-        import time
-        
-        # Bot'ni alohida thread'da ishga tushirish (xavfsiz)
-        def run_bot_thread():
-            try:
-                logger.info("🤖 Bot thread ishga tushmoqda...")
-                asyncio.run(run_bot())
-            except Exception as e:
-                logger.error(f"❌ Bot thread xatosi: {e}")
-                import traceback
-                traceback.print_exc()
-                # Bot crash bo'lsa ham API ishlashda davom etsin
-        
-        bot_thread = threading.Thread(target=run_bot_thread, daemon=True)
+        # 1. Bot'ni ALOHIDA thread'da ishga tushirish (daemon=True)
+        bot_thread = threading.Thread(target=run_bot_polling, daemon=True)
         bot_thread.start()
-        logger.info("✅ Bot thread boshlandi (daemon)")
+        logger.info("✅ Bot thread boshlandi")
         
-        # Biroz kutish
-        time.sleep(1)
+        # 2. Biroz kutish
+        time.sleep(2)
         
-        # API ni asosiy thread'da ishga tushirish (Railway healthcheck uchun MUHIM!)
-        logger.info("✅ API server ishga tushmoqda (asosiy thread)...")
+        # 3. API ni ASOSIY thread'da ishga tushirish (Railway uchun MUHIM!)
+        logger.info("✅ API server boshlanmoqda (asosiy thread)...")
         run_api()
-    else:
-        # Local development - ikkalasi ham ishlaydi
-        logger.info("✅ Local mode")
         
-        # API ni alohida thread'da
+    else:
+        # Local rejim
+        logger.info("✅ Local mode - PORT=8000")
+        
+        # API ni background'da
         api_thread = threading.Thread(target=run_api, daemon=True)
         api_thread.start()
-        logger.info("✅ API server ishga tushdi (port 8000)")
+        
+        time.sleep(2)
         
         # Bot ni asosiy thread'da
-        asyncio.run(run_bot())
+        run_bot_polling()
 
 
 if __name__ == "__main__":
