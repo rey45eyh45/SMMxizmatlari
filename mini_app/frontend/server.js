@@ -26,10 +26,6 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'SMM Mini App' });
-});
-
 // Server avval ishga tushsin
 const server = app.listen(PORT, HOST, () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
