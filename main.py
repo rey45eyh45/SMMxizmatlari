@@ -5086,6 +5086,31 @@ dp.include_router(sms_router)  # SMS router birinchi - prioritet
 dp.include_router(router)
 
 
+# ==================== ERROR HANDLERS ====================
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+
+@dp.error()
+async def error_handler(event, exception):
+    """Global xatoliklarni qayta ishlash"""
+    if isinstance(exception, TelegramBadRequest):
+        # Xabar mavjud emas yoki o'zgartirib bo'lmaydi
+        logger.warning(f"TelegramBadRequest: {exception}")
+        return True
+    elif isinstance(exception, TelegramForbiddenError):
+        # Foydalanuvchi botni bloklagan
+        logger.warning(f"User blocked bot: {exception}")
+        return True
+    elif isinstance(exception, TelegramRetryAfter):
+        # Flood control - kutish kerak
+        logger.warning(f"Flood control, waiting {exception.retry_after}s")
+        await asyncio.sleep(exception.retry_after)
+        return True
+    else:
+        # Boshqa xatoliklar
+        logger.error(f"Unhandled exception: {type(exception).__name__}: {exception}")
+        return True
+
+
 # ==================== AVTOMATIK ZAXIRA SCHEDULER ====================
 async def auto_backup_scheduler(bot_instance):
     """Har kuni soat 03:00 da avtomatik zaxira"""

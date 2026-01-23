@@ -70,7 +70,7 @@ async def sms_platforms_menu(call: CallbackQuery):
 async def sms_back_to_menu(call: CallbackQuery):
     """Asosiy menyuga qaytish"""
     await call.message.delete()
-    await call.message.answer("Asosiy menyu", reply_markup=main_menu())
+    await call.message.answer("Asosiy menyu", reply_markup=main_menu(call.from_user.id))
     await call.answer()
 
 

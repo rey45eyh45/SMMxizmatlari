@@ -1007,7 +1007,6 @@ def get_pending_click_payments():
     except Exception as e:
         logger.error(f"get_pending_click_payments error: {e}")
         return []
-        return False
 
 
 def get_pending_premium_requests():
