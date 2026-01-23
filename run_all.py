@@ -17,6 +17,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def init_database():
+    """Database ni ishga tushirish"""
+    try:
+        from database import init_db
+        init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.error(f"❌ Database init error: {e}")
+
+
 def run_api():
     """FastAPI serverni ishga tushirish"""
     import uvicorn
@@ -38,17 +48,17 @@ def run_api():
 def run_bot_polling():
     """Telegram bot'ni polling rejimida ishga tushirish"""
     try:
-        # Bot modulini FAQAT shu yerda import qilish
         logger.info("🤖 Bot moduli import qilinmoqda...")
-        from main import bot, dp, router
+        from main import bot, dp
         
         logger.info("🤖 Bot polling boshlanmoqda...")
         
-        # Router allaqachon main.py da ulangan, qayta ulamaslik kerak!
-        # dp.include_router(router)  # BU KERAK EMAS!
+        # Thread'da ishlash uchun yangi event loop yaratish
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        # Polling boshlash
-        asyncio.run(dp.start_polling(bot))
+        # Signal handler'siz polling (handle_signals=False)
+        loop.run_until_complete(dp.start_polling(bot, handle_signals=False))
     except Exception as e:
         logger.error(f"❌ Bot xatosi: {e}")
         import traceback
@@ -58,6 +68,9 @@ def run_bot_polling():
 def main():
     """Asosiy funksiya - API va bot ni birga ishga tushirish"""
     logger.info("🚀 SMM Bot + API ishga tushmoqda...")
+    
+    # Database ni avval ishga tushirish
+    init_database()
     
     port = os.getenv("PORT")
     logger.info(f"📌 PORT env: {port}")
