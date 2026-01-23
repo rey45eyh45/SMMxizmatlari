@@ -194,6 +194,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const refetchUser = async () => {
+    // Agar mavjud user bo'lsa - faqat balansni yangilash
+    if (user?.user_id) {
+      try {
+        console.log('Refreshing user data for:', user.user_id)
+        const response = await userAPI.refreshBalance(user.user_id)
+        if (response.success && response.user) {
+          console.log('New balance:', response.user.balance)
+          setUser(response.user)
+          return
+        }
+      } catch (err) {
+        console.error('Failed to refresh user:', err)
+      }
+    }
+    // Fallback - to'liq authentication
     await authenticate()
   }
 

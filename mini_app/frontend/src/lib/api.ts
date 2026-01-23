@@ -65,15 +65,17 @@ export const userAPI = {
     return data
   },
   
-  getById: async (userId: number): Promise<{ success: boolean; user: User }> => {
+  getById: async (userId: number, forceRefresh: boolean = false): Promise<{ success: boolean; user: User }> => {
     // Cache-control header qo'shib so'rov yuborish
     const { data } = await api.get(`/api/user/${userId}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+        'Pragma': 'no-cache',
+        'Expires': '0'
       },
       params: {
-        _t: Date.now() // Cache busting
+        _t: Date.now(), // Cache busting
+        _refresh: forceRefresh ? '1' : '0'
       }
     })
     return data
@@ -105,6 +107,22 @@ export const userAPI = {
   
   getReferralStats: async (): Promise<ReferralStats> => {
     const { data } = await api.get('/api/referral/stats')
+    return data
+  },
+  
+  // Balansni majburiy yangilash uchun maxsus funksiya
+  refreshBalance: async (userId: number): Promise<{ success: boolean; user: User }> => {
+    const { data } = await api.get(`/api/user/${userId}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+      params: {
+        _t: Date.now(),
+        _nocache: Math.random().toString(36).substring(7)
+      }
+    })
     return data
   }
 }

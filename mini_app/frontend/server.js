@@ -167,6 +167,11 @@ app.get('/health', (req, res) => {
 app.get('/api/user/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
   
+  // Cache-control headers
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  
   console.log('Getting user:', userId, 'from BOT_API_URL:', BOT_API_URL);
   
   try {
@@ -175,13 +180,36 @@ app.get('/api/user/:userId', async (req, res) => {
     console.log('Fetching from:', url);
     
     const botResponse = await axios.get(url, {
-      timeout: 10000  // 10 sekund timeout
+      timeout: 10000,  // 10 sekund timeout
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      params: {
+        _t: Date.now()  // Cache busting
+      }
     });
     
     console.log('Bot API response:', botResponse.status, botResponse.data);
     
     if (botResponse.data.success) {
       console.log('Got user from Bot API:', botResponse.data.user);
+      
+      // Local bazani ham yangilash (sync uchun)
+      if (db && botResponse.data.user) {
+        try {
+          const u = botResponse.data.user;
+          db.run(`
+            INSERT OR REPLACE INTO users (user_id, username, full_name, balance, referral_count, referral_earnings, is_banned, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `, [u.user_id, u.username, u.full_name, u.balance, u.referral_count, u.referral_earnings, u.is_banned ? 1 : 0, u.created_at]);
+          saveDb();
+          console.log('Local database synced with Bot API');
+        } catch (syncErr) {
+          console.log('Could not sync local db:', syncErr.message);
+        }
+      }
+      
       return res.json(botResponse.data);
     }
   } catch (err) {
@@ -230,7 +258,6 @@ app.get('/api/user/:userId', async (req, res) => {
         created_at: user.created_at || ''
       },
       warning: 'Balans ma\'lumoti eskirgan bo\'lishi mumkin. Bot API ga ulanib bo\'lmadi.'
-    });
     });
   } catch (err) {
     console.error('Error getting user:', err);
@@ -289,8 +316,13 @@ app.post('/api/user/create', (req, res) => {
 });
 
 // Auth endpoint
-app.post('/api/auth', (req, res) => {
+app.post('/api/auth', async (req, res) => {
   const { init_data } = req.body;
+  
+  // Cache-control headers
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   
   // For now, just parse user from init_data
   // In production, validate with BOT_TOKEN
@@ -307,6 +339,81 @@ app.post('/api/auth', (req, res) => {
     }
     
     const tgUser = JSON.parse(decodeURIComponent(userStr));
+    const fullName = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
+    
+    // MUHIM: Bot API'dan foydalanuvchi ma'lumotlarini olish
+    try {
+      // Avval mavjud foydalanuvchini tekshirish
+      const getUrl = `${BOT_API_URL}/api/user/${tgUser.id}`;
+      console.log('Auth: Getting user from Bot API:', getUrl);
+      
+      try {
+        const botResponse = await axios.get(getUrl, {
+          timeout: 10000,
+          params: { _t: Date.now() }
+        });
+        
+        if (botResponse.data.success && botResponse.data.user) {
+          console.log('Auth: Got user from Bot API:', botResponse.data.user.balance);
+          
+          // Local bazani sinxronlash
+          if (db) {
+            try {
+              const u = botResponse.data.user;
+              db.run(`
+                INSERT OR REPLACE INTO users (user_id, username, full_name, balance, referral_count, referral_earnings, is_banned, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `, [u.user_id, u.username, u.full_name, u.balance, u.referral_count, u.referral_earnings, u.is_banned ? 1 : 0, u.created_at]);
+              saveDb();
+            } catch (syncErr) {
+              console.log('Could not sync local db:', syncErr.message);
+            }
+          }
+          
+          return res.json(botResponse.data);
+        }
+      } catch (getErr) {
+        console.log('User not found in Bot API, creating...');
+      }
+      
+      // Foydalanuvchi topilmadi - yaratish
+      const createUrl = `${BOT_API_URL}/api/user/create`;
+      console.log('Auth: Creating user via Bot API:', createUrl);
+      
+      const createResponse = await axios.post(createUrl, {
+        user_id: tgUser.id,
+        username: tgUser.username || '',
+        full_name: fullName
+      }, {
+        timeout: 10000
+      });
+      
+      if (createResponse.data.success && createResponse.data.user) {
+        console.log('Auth: Created user via Bot API:', createResponse.data.user);
+        
+        // Local bazani sinxronlash
+        if (db) {
+          try {
+            const u = createResponse.data.user;
+            db.run(`
+              INSERT OR REPLACE INTO users (user_id, username, full_name, balance, referral_count, referral_earnings, is_banned, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [u.user_id, u.username, u.full_name, u.balance, u.referral_count, u.referral_earnings, u.is_banned ? 1 : 0, u.created_at]);
+            saveDb();
+          } catch (syncErr) {
+            console.log('Could not sync local db:', syncErr.message);
+          }
+        }
+        
+        return res.json(createResponse.data);
+      }
+    } catch (botErr) {
+      console.error('Bot API error during auth:', botErr.message);
+      // Fallback to local database
+    }
+    
+    // FALLBACK: Bot API ishlamasa - local bazadan
+    console.warn('WARNING: Falling back to local database for auth');
     
     if (!db) {
       return res.status(500).json({ success: false, error: 'Database not available' });
@@ -318,7 +425,6 @@ app.post('/api/auth', (req, res) => {
     
     if (!user) {
       const now = new Date().toISOString();
-      const fullName = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
       db.run(`
         INSERT INTO users (user_id, username, full_name, balance, created_at)
         VALUES (?, ?, ?, 0, ?)
@@ -341,7 +447,8 @@ app.post('/api/auth', (req, res) => {
         referral_earnings: user.referral_earnings || 0,
         is_banned: !!user.is_banned,
         created_at: user.created_at || ''
-      }
+      },
+      warning: 'Bot API ga ulanib bo\'lmadi. Balans eskirgan bo\'lishi mumkin.'
     });
   } catch (err) {
     console.error('Auth error:', err);
